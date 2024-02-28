@@ -5,7 +5,7 @@ plugins {
     id 'dagger.hilt.android.plugin'
     id 'kotlin-kapt'
     id 'kotlin-parcelize'
-    id 'com.google.devtools.ksp' version '1.8.10-1.0.9'
+    id 'com.google.devtools.ksp'
 }
 
 def tagName = 'v1.3.0-beta'
@@ -66,8 +66,8 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.7.0"
 
     //Hilt
-    implementation "com.google.dagger:hilt-android:2.44.2"
-    kapt "com.google.dagger:hilt-compiler:2.44.2"
+    implementation "com.google.dagger:hilt-android:2.50"
+    kapt "com.google.dagger:hilt-compiler:2.50"
 
    //Timber
     implementation 'com.jakewharton.timber:timber:5.0.1'
@@ -75,7 +75,7 @@ dependencies {
     //Room
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
-    kapt 'androidx.room:room-compiler:2.6.1'
+    ksp 'androidx.room:room-compiler:2.6.1'
 
     //HiddenApiBypass
     implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
@@ -92,21 +92,11 @@ dependencies {
         //exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-ktx"
     }
 
-    implementation 'com.highcapable.yukihookapi:api:1.1.11'
-    ksp 'com.highcapable.yukihookapi:ksp-xposed:1.1.11'
+    implementation 'com.highcapable.yukihookapi:api:1.2.0'
+    ksp 'com.highcapable.yukihookapi:ksp-xposed:1.2.0'
     implementation 'com.facebook.shimmer:shimmer:0.5.0'
     implementation 'com.github.KieronQuinn:MonetCompat:0.4.1'
     implementation 'androidx.palette:palette-ktx:1.0.0'
 
-
-    implementation 'io.github.controlwear:virtualjoystick:1.10.1'
-
-
-
-
-
-
-
-
-
+    implementation 'com.github.controlwear:virtual-joystick-android:-SNAPSHOT'
 }
