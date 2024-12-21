@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.adapter
+package com.cysindex.telequant.adapter
 
 import android.view.LayoutInflater
 import android.view.View
@@ -8,8 +8,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.android1500.gpssetter.R
-import com.android1500.gpssetter.room.Favourite
+import com.cysindex.telequant.R
+import com.cysindex.telequant.room.Favourite
 
 class FavListAdapter(
     ) : ListAdapter<Favourite,FavListAdapter.ViewHolder>(FavListComparetor()) {

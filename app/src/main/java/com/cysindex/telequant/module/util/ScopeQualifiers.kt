@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.module.util
+package com.cysindex.telequant.module.util
 
 import javax.inject.Qualifier
 

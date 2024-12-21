@@ -1,9 +1,9 @@
-package com.android1500.gpssetter.update
+package com.cysindex.telequant.update
 
 import android.content.Context
 import android.os.Parcelable
-import com.android1500.gpssetter.BuildConfig
-import com.android1500.gpssetter.utils.PrefManager
+import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.utils.PrefManager
 import kotlinx.android.parcel.Parcelize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose

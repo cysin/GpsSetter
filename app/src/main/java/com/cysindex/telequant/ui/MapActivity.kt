@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.ui
+package com.cysindex.telequant.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -34,15 +34,15 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.android1500.gpssetter.BuildConfig
-import com.android1500.gpssetter.R
-import com.android1500.gpssetter.adapter.FavListAdapter
-import com.android1500.gpssetter.databinding.ActivityMapBinding
-import com.android1500.gpssetter.ui.viewmodel.MainViewModel
-import com.android1500.gpssetter.utils.JoystickService
-import com.android1500.gpssetter.utils.NotificationsChannel
-import com.android1500.gpssetter.utils.PrefManager
-import com.android1500.gpssetter.utils.ext.*
+import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.R
+import com.cysindex.telequant.adapter.FavListAdapter
+import com.cysindex.telequant.databinding.ActivityMapBinding
+import com.cysindex.telequant.ui.viewmodel.MainViewModel
+import com.cysindex.telequant.utils.JoystickService
+import com.cysindex.telequant.utils.NotificationsChannel
+import com.cysindex.telequant.utils.PrefManager
+import com.cysindex.telequant.utils.ext.*
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap

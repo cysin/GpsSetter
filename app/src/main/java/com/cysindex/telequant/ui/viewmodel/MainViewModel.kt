@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.ui.viewmodel
+package com.cysindex.telequant.ui.viewmodel
 
 
 import android.app.DownloadManager
@@ -16,15 +16,15 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android1500.gpssetter.BuildConfig
-import com.android1500.gpssetter.R
-import com.android1500.gpssetter.utils.ext.onIO
-import com.android1500.gpssetter.utils.ext.onMain
-import com.android1500.gpssetter.repository.FavouriteRepository
-import com.android1500.gpssetter.utils.PrefManager
-import com.android1500.gpssetter.room.Favourite
-import com.android1500.gpssetter.update.UpdateChecker
-import com.android1500.gpssetter.utils.ext.showToast
+import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.R
+import com.cysindex.telequant.utils.ext.onIO
+import com.cysindex.telequant.utils.ext.onMain
+import com.cysindex.telequant.repository.FavouriteRepository
+import com.cysindex.telequant.utils.PrefManager
+import com.cysindex.telequant.room.Favourite
+import com.cysindex.telequant.update.UpdateChecker
+import com.cysindex.telequant.utils.ext.showToast
 import com.highcapable.yukihookapi.YukiHookAPI
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

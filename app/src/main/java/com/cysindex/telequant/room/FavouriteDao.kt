@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.room
+package com.cysindex.telequant.room
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 

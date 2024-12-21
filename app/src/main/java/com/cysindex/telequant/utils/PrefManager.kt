@@ -1,10 +1,10 @@
-package com.android1500.gpssetter.utils
+package com.cysindex.telequant.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import com.android1500.gpssetter.BuildConfig
-import com.android1500.gpssetter.gsApp
+import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.gsApp
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope

@@ -1,7 +1,7 @@
-package com.android1500.gpssetter
+package com.cysindex.telequant
 
 import androidx.appcompat.app.AppCompatDelegate
-import com.android1500.gpssetter.utils.PrefManager
+import com.cysindex.telequant.utils.PrefManager
 import com.highcapable.yukihookapi.hook.xposed.application.ModuleApplication
 import com.kieronquinn.monetcompat.core.MonetCompat
 import dagger.hilt.android.HiltAndroidApp

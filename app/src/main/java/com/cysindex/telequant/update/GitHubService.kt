@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.update
+package com.cysindex.telequant.update
 
 import retrofit2.Call
 import retrofit2.http.GET

@@ -1,5 +1,5 @@
-package com.android1500.gpssetter.xposed
-import com.android1500.gpssetter.BuildConfig
+package com.cysindex.telequant.xposed
+import com.cysindex.telequant.BuildConfig
 import de.robv.android.xposed.XSharedPreferences
 
  class Xshare {

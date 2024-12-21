@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.update
+package com.cysindex.telequant.update
 
 import com.google.gson.annotations.Expose
 import com.google.gson.annotations.SerializedName

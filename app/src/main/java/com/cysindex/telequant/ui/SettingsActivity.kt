@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.ui
+package com.cysindex.telequant.ui
 
 
 import android.app.ActivityManager
@@ -20,11 +20,11 @@ import androidx.core.content.ContextCompat.getSystemService
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceDataStore
-import com.android1500.gpssetter.R
-import com.android1500.gpssetter.databinding.SettingsActivityBinding
-import com.android1500.gpssetter.utils.JoystickService
-import com.android1500.gpssetter.utils.PrefManager
-import com.android1500.gpssetter.utils.ext.showToast
+import com.cysindex.telequant.R
+import com.cysindex.telequant.databinding.SettingsActivityBinding
+import com.cysindex.telequant.utils.JoystickService
+import com.cysindex.telequant.utils.PrefManager
+import com.cysindex.telequant.utils.ext.showToast
 import com.highcapable.yukihookapi.hook.xposed.prefs.ui.ModulePreferenceFragment
 import com.kieronquinn.monetcompat.app.MonetCompatActivity
 import rikka.preference.SimpleMenuPreference
@@ -184,7 +184,7 @@ class SettingsActivity : MonetCompatActivity() {
             var isRunning = false
             val manager = requireContext().getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager? ?: return false
             for (service in manager.getRunningServices(Int.MAX_VALUE)) {
-                if ("com.android1500.gpssetter.utils.JoystickService" == service.service.className) {
+                if ("com.cysindex.telequant.utils.JoystickService" == service.service.className) {
                     isRunning = true
                 }
             }

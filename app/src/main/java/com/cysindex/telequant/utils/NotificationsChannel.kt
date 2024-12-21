@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.utils
+package com.cysindex.telequant.utils
 
 import android.app.Notification
 import android.app.NotificationManager
@@ -6,7 +6,7 @@ import android.content.Context
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.android1500.gpssetter.R
+import com.cysindex.telequant.R
  class NotificationsChannel{
 
     private fun createChannelIfNeeded(context: Context) {

@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.xposed
+package com.cysindex.telequant.xposed
 
 import android.annotation.SuppressLint
 import android.app.AndroidAppHelper
@@ -8,9 +8,9 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.location.LocationRequest
-import com.android1500.gpssetter.BuildConfig
-import com.android1500.gpssetter.gsApp
-import com.android1500.gpssetter.xposed.LocationHook.hook
+import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.gsApp
+import com.cysindex.telequant.xposed.LocationHook.hook
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import com.highcapable.yukihookapi.hook.log.loggerW
 import com.highcapable.yukihookapi.hook.type.java.BooleanType
@@ -56,7 +56,7 @@ object LocationHook : YukiBaseHooker() {
             accuracy = settings.accuracy!!.toFloat()
 
         }catch (e: Exception) {
-            Timber.tag("GPS Setter").e(e, "Failed to get XposedSettings for %s", context.packageName)
+            Timber.tag("TeleQuant").e(e, "Failed to get XposedSettings for %s", context.packageName)
         }
 
     }

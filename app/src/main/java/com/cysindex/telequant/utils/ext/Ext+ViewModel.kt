@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.utils.ext
+package com.cysindex.telequant.utils.ext
 
 import android.content.Context
 import android.location.Geocoder

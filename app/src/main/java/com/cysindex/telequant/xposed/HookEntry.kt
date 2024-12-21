@@ -1,6 +1,6 @@
-package com.android1500.gpssetter.xposed
+package com.cysindex.telequant.xposed
 
-import com.android1500.gpssetter.BuildConfig
+import com.cysindex.telequant.BuildConfig
 import com.highcapable.yukihookapi.annotation.xposed.InjectYukiHookWithXposed
 import com.highcapable.yukihookapi.hook.factory.configs
 import com.highcapable.yukihookapi.hook.factory.encase

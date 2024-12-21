@@ -1,14 +1,14 @@
-package com.android1500.gpssetter.module
+package com.cysindex.telequant.module
 
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
 import androidx.room.Room
-import com.android1500.gpssetter.module.util.ApplicationScope
-import com.android1500.gpssetter.utils.PrefManager
-import com.android1500.gpssetter.room.AppDatabase
-import com.android1500.gpssetter.room.FavouriteDao
-import com.android1500.gpssetter.update.GitHubService
+import com.cysindex.telequant.module.util.ApplicationScope
+import com.cysindex.telequant.utils.PrefManager
+import com.cysindex.telequant.room.AppDatabase
+import com.cysindex.telequant.room.FavouriteDao
+import com.cysindex.telequant.update.GitHubService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

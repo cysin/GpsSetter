@@ -1,4 +1,4 @@
-package com.android1500.gpssetter.utils
+package com.cysindex.telequant.utils
 
 import android.annotation.SuppressLint
 import android.app.Service
@@ -8,8 +8,8 @@ import android.graphics.PixelFormat
 import android.os.IBinder
 import android.util.Log
 import android.view.*
-import com.android1500.gpssetter.R
-import com.android1500.gpssetter.utils.ext.showToast
+import com.cysindex.telequant.R
+import com.cysindex.telequant.utils.ext.showToast
 import io.github.controlwear.virtual.joystick.android.JoystickView
 import kotlin.math.cos
 import kotlin.math.sin
