@@ -21,9 +21,9 @@
 #-renamesourcefileattribute SourceFile
 
 
--keep class com.android1500.gpssetter.xposed.XposedHook{*;}
--keep class com.android1500.gpssetter.xposed.Xshare{ *;}
--keepnames class com.android1500.gpssetter.selfhook.XposedSelfHooks{*;}
+-keep class com.cysindex.telequant.xposed.XposedHook{*;}
+-keep class com.cysindex.telequant.xposed.Xshare{ *;}
+-keepnames class com.cysindex.telequant.selfhook.XposedSelfHooks{*;}
 -keep class de.robv.android.xposed.**{*;}
 -keepnames class de.robv.android.xposed.**
 

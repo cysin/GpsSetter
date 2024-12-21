@@ -1,4 +1,4 @@
-package com.android1500.gpssetter
+package com.cysindex.telequant
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.android1500.gpssetter", appContext.packageName)
+        assertEquals("com.cysindex.telequant", appContext.packageName)
     }
 }

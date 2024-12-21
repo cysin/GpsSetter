@@ -2,7 +2,7 @@
 
     <!-- Home -->
 
-    <string name="app_name">GPS Setter</string>
+    <string name="app_name">TeleQuant</string>
     <string name="title_activity_maps">MapsActivity</string>
     <string name="xposed_desc">Set location</string>
     <string name="search">Search</string>
@@ -35,7 +35,7 @@
     <!-- About -->
 
     <string name="about">About</string>
-    <string name="about_tittle">GPS Setter</string>
+    <string name="about_tittle">TeleQuant</string>
     <string name="about_info">A module which will set your location where you want without enable mock location.</string>
 
     <!-- Update -->

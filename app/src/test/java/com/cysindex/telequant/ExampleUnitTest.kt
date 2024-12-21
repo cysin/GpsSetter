@@ -1,4 +1,4 @@
-package com.android1500.gpssetter
+package com.cysindex.telequant
 
 import org.junit.Test
 

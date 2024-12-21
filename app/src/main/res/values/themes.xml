@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Theme.GPSSetter" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.TeleQuant" parent="Theme.Material3.DayNight.NoActionBar">
 
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/primary</item>
@@ -11,7 +11,7 @@
         <item name="android:windowLightStatusBar">@bool/lightStatusNav</item>
         <item name="android:windowLightNavigationBar">@bool/lightStatusNav</item>
         <item name="android:overScrollMode">@integer/overscroll_enabled</item>
-        <item name="actionOverflowMenuStyle">@style/GPSSetterOverflowMenu</item>
+        <item name="actionOverflowMenuStyle">@style/TeleQuantOverflowMenu</item>
 
 
 
