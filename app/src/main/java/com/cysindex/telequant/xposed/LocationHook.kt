@@ -8,6 +8,7 @@ import android.os.Message
 import android.location.Location
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiSsid
+import android.net.MacAddress
 import android.location.LocationListener
 import android.location.LocationManager
 import android.location.LocationRequest
@@ -32,6 +33,7 @@ import com.highcapable.yukihookapi.hook.type.android.BundleClass
 import com.highcapable.yukihookapi.hook.type.java.ByteArrayType
 import com.highcapable.yukihookapi.hook.type.java.IntType
 import com.highcapable.yukihookapi.hook.type.java.ListClass
+import com.highcapable.yukihookapi.hook.type.java.LongType
 import com.highcapable.yukihookapi.hook.type.java.StringArrayClass
 import com.highcapable.yukihookapi.hook.type.java.StringClass
 import com.highcapable.yukihookapi.hook.type.java.UnitType
@@ -227,6 +229,7 @@ object LocationHook : YukiBaseHooker() {
             }
         }
 
+        /*
         "android.net.wifi.ScanResult".toClass().apply {
             method {
                 name = "getWifiSsid"
@@ -242,8 +245,72 @@ object LocationHook : YukiBaseHooker() {
                     }
                 }
             }
-        }
 
+            method {
+                name = "getApMldMacAddress"
+                emptyParam()
+                returnType = MacAddress::class.java
+            }.hook {
+                before {
+                    if(settings.isStarted && !ignorePkg.contains(packageName)) {
+                        replaceTo(null)
+                        result = null
+                        XposedBridge.log("[${packageName}] - getApMldMacAddress")
+
+                    }
+                }
+            }
+
+            method {
+                name = "toString"
+                emptyParam()
+                returnType = StringClass
+            }.hook {
+                before {
+                    if(settings.isStarted && !ignorePkg.contains(packageName)) {
+                        val emptyString = ""
+                        replaceTo(emptyString)
+                        result = emptyString
+                        XposedBridge.log("[${packageName}] - toString")
+
+                    }
+                }
+            }
+
+            constructor { param(ScanResult::class.java) }.hook {
+                // Before hook the method
+                // 在方法执行之前拦截
+                after {
+                    // 我们在顶部使用了 "apply" 方法
+                    field {
+                        name = "BSSID"
+                        type = StringClass
+                    }.get(instance).set("")
+                }
+            }
+
+            /*
+            method {
+                name = "ScanResult"
+                param(
+                    ScanResult::class.java
+
+                )
+            }.hook {
+                after {
+                    // 我们在顶部使用了 "apply" 方法
+                    field {
+                        name = "BSSID"
+                        type = StringClass
+                    }.get(instance).set("")
+                }
+
+            }*/
+
+        }
+        */
+
+        /*
         "android.net.wifi.WifiSsid".toClass().apply {
             method {
                 name = "getBytes"
@@ -278,136 +345,725 @@ object LocationHook : YukiBaseHooker() {
             }
 
         }
+        */
 
-        "android.telephony.CellIdentityLte".toClass().apply {
-            method {
-                name = "getCi"
-                emptyParam()
-                returnType = IntType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        val newcid: Long = 10510196757
-                        replaceTo(newcid)
 
-                        result = newcid
-                        XposedBridge.log("[${packageName}] - getCi")
+        if("android.telephony.CellIdentityGsm".hasClass()) {
+            "android.telephony.CellIdentityGsm".toClass().apply {
+                method {
+                    name = "getCid"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newcid: Int = 0
+                            replaceTo(newcid)
+
+                            result = newcid
+                            XposedBridge.log("[${packageName}] GSM - getCid")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getMcc"
-                emptyParam()
-                returnType = IntType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newmcc: Int = 460
-                        replaceTo(newmcc)
+                method {
+                    name = "getMcc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmcc: Int = 460
+                            replaceTo(newmcc)
 
-                        result = newmcc
-                        XposedBridge.log("[${packageName}] - getMcc")
+                            result = newmcc
+                            XposedBridge.log("[${packageName}] GSM - getMcc")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getMccString"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newmccstring: String = "460"
-                        replaceTo(newmccstring)
+                method {
+                    name = "getMccString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmccstring: String = "460"
+                            replaceTo(newmccstring)
 
-                        result = newmccstring
-                        XposedBridge.log("[${packageName}] - getMccString")
+                            result = newmccstring
+                            XposedBridge.log("[${packageName}] GSM - getMccString")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getMnc"
-                emptyParam()
-                returnType = IntType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newmnc: Int = 0
-                        replaceTo(newmnc)
+                method {
+                    name = "getMnc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmnc: Int = 0
+                            replaceTo(newmnc)
 
-                        result = newmnc
-                        XposedBridge.log("[${packageName}] - getMnc")
+                            result = newmnc
+                            XposedBridge.log("[${packageName}] GSM - getMnc")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getMncString"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newmncstring: String = "00"
-                        replaceTo(newmncstring)
+                method {
+                    name = "getMncString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmncstring: String = "00"
+                            replaceTo(newmncstring)
 
-                        result = newmncstring
-                        XposedBridge.log("[${packageName}] - getMncString")
+                            result = newmncstring
+                            XposedBridge.log("[${packageName}] GSM - getMncString")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getTac"
-                emptyParam()
-                returnType = IntType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newtac: Int = 6815749
-                        replaceTo(newtac)
+                method {
+                    name = "getLac"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newlac: Int = 0//6815749
+                            replaceTo(newlac)
 
-                        result = newtac
-                        XposedBridge.log("[${packageName}] - getTac")
+                            result = newlac
+                            XposedBridge.log("[${packageName}] GSM - getLac")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "getPci"
-                emptyParam()
-                returnType = IntType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newpci: Int = 999
-                        replaceTo(newpci)
+                method {
+                    name = "getPsc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newpsc: Int = 0//999
+                            replaceTo(newpsc)
 
-                        result = newpci
-                        XposedBridge.log("[${packageName}] - getPci")
+                            result = newpsc
+                            XposedBridge.log("[${packageName}] GSM - getPsc")
+                        }
                     }
                 }
-            }
 
-            method {
-                name = "toString"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        var newstring: String = "-"
-                        replaceTo(newstring)
+                method {
+                    name = "getBsic"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newbsic: Int = 0//999
+                            replaceTo(newbsic)
 
-                        result = newstring
-                        XposedBridge.log("[${packageName}] - toString")
+                            result = newbsic
+                            XposedBridge.log("[${packageName}] GSM - getBsic")
+                        }
                     }
                 }
-            }
 
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] GSM - toString")
+                        }
+                    }
+                }
+
+            }
+        } // gsm
+
+        if("android.telephony.CellIdentityCdma".hasClass()) {
+            "android.telephony.CellIdentityCdma".toClass().apply {
+                method {
+                    name = "getBasestationId"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newid: Int = 0
+                            replaceTo(newid)
+
+                            result = newid
+                            XposedBridge.log("[${packageName}] CDMA - getBasestationId")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getLatitude"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newid: Int = 0
+                            replaceTo(newid)
+
+                            result = newid
+                            XposedBridge.log("[${packageName}] CDMA - getLatitude")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getLongitude"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newid: Int = 0
+                            replaceTo(newid)
+
+                            result = newid
+                            XposedBridge.log("[${packageName}] CDMA - getLongitude")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getNetworkId"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newid: Int = 0
+                            replaceTo(newid)
+
+                            result = newid
+                            XposedBridge.log("[${packageName}] CDMA - getNetworkId")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getSystemId"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newid: Int = 0
+                            replaceTo(newid)
+
+                            result = newid
+                            XposedBridge.log("[${packageName}] CDMA - getSystemId")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] WCDMA - toString")
+                        }
+                    }
+                }
+
+            }
+        } // cdma
+
+        if("android.telephony.CellIdentityWcdma".hasClass()) {
+            "android.telephony.CellIdentityWcdma".toClass().apply {
+                method {
+                    name = "getCid"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newcid: Int = 0
+                            replaceTo(newcid)
+
+                            result = newcid
+                            XposedBridge.log("[${packageName}] WCDMA - getCid")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMcc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmcc: Int = 460
+                            replaceTo(newmcc)
+
+                            result = newmcc
+                            XposedBridge.log("[${packageName}] WCDMA - getMcc")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMccString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmccstring: String = "460"
+                            replaceTo(newmccstring)
+
+                            result = newmccstring
+                            XposedBridge.log("[${packageName}] WCDMA - getMccString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMnc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmnc: Int = 0
+                            replaceTo(newmnc)
+
+                            result = newmnc
+                            XposedBridge.log("[${packageName}] WCDMA - getMnc")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMncString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmncstring: String = "00"
+                            replaceTo(newmncstring)
+
+                            result = newmncstring
+                            XposedBridge.log("[${packageName}] WCDMA - getMncString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getLac"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newlac: Int = 0//6815749
+                            replaceTo(newlac)
+
+                            result = newlac
+                            XposedBridge.log("[${packageName}] WCDMA - getLac")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getPsc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newpsc: Int = 0//999
+                            replaceTo(newpsc)
+
+                            result = newpsc
+                            XposedBridge.log("[${packageName}] WCDMA - getPsc")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] WCDMA - toString")
+                        }
+                    }
+                }
+
+            }
+        } // wcdma
+
+        if("android.telephony.CellIdentityTdscdma".hasClass()) {
+            "android.telephony.CellIdentityTdscdma".toClass().apply {
+                method {
+                    name = "getCid"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newcid: Int = 0
+                            replaceTo(newcid)
+
+                            result = newcid
+                            XposedBridge.log("[${packageName}] TDSCDMA - getCid")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMccString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmccstring: String = "460"
+                            replaceTo(newmccstring)
+
+                            result = newmccstring
+                            XposedBridge.log("[${packageName}] TDSCDMA - getMccString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMncString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmncstring: String = "00"
+                            replaceTo(newmncstring)
+
+                            result = newmncstring
+                            XposedBridge.log("[${packageName}] TDSCDMA - getMncString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getLac"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newlac: Int = 0//6815749
+                            replaceTo(newlac)
+
+                            result = newlac
+                            XposedBridge.log("[${packageName}] TDSCDMA - getLac")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getCpid"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newcpid: Int = 0//999
+                            replaceTo(newcpid)
+
+                            result = newcpid
+                            XposedBridge.log("[${packageName}] TDSCDMA - getCpid")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] TDSCDMA - toString")
+                        }
+                    }
+                }
+
+            }
+        } // tdcdma
+
+        if("android.telephony.CellIdentityLte".hasClass()) {
+            "android.telephony.CellIdentityLte".toClass().apply {
+                method {
+                    name = "getCi"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newcid: Int = 0
+                            replaceTo(newcid)
+
+                            result = newcid
+                            XposedBridge.log("[${packageName}] LTE - getCi")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMcc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmcc: Int = 460
+                            replaceTo(newmcc)
+
+                            result = newmcc
+                            XposedBridge.log("[${packageName}] LTE - getMcc")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMccString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmccstring: String = "460"
+                            replaceTo(newmccstring)
+
+                            result = newmccstring
+                            XposedBridge.log("[${packageName}] LTE - getMccString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMnc"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmnc: Int = 0
+                            replaceTo(newmnc)
+
+                            result = newmnc
+                            XposedBridge.log("[${packageName}] LTE - getMnc")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMncString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmncstring: String = "00"
+                            replaceTo(newmncstring)
+
+                            result = newmncstring
+                            XposedBridge.log("[${packageName}] LTE - getMncString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getTac"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newtac: Int = 0//6815749
+                            replaceTo(newtac)
+
+                            result = newtac
+                            XposedBridge.log("[${packageName}] LTE - getTac")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getPci"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newpci: Int = 0//999
+                            replaceTo(newpci)
+
+                            result = newpci
+                            XposedBridge.log("[${packageName}] LTE - getPci")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] LTE - toString")
+                        }
+                    }
+                }
+
+            }
+        }
+
+        if("android.telephony.CellIdentityNr".hasClass()) {
+            "android.telephony.CellIdentityNr".toClass().apply {
+                method {
+                    name = "getNci"
+                    emptyParam()
+                    returnType = LongType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            val newcid: Long = 0
+                            replaceTo(newcid)
+
+                            result = newcid
+                            XposedBridge.log("[${packageName}] Nr - getNci")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMccString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmccstring: String = "460"
+                            replaceTo(newmccstring)
+
+                            result = newmccstring
+                            XposedBridge.log("[${packageName}] Nr - getMccString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getMncString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newmncstring: String = "00"
+                            replaceTo(newmncstring)
+
+                            result = newmncstring
+                            XposedBridge.log("[${packageName}] Nr - getMncString")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getTac"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newtac: Int = 0//6815749
+                            replaceTo(newtac)
+
+                            result = newtac
+                            XposedBridge.log("[${packageName}] Nr - getTac")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getPci"
+                    emptyParam()
+                    returnType = IntType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newpci: Int = 0//999
+                            replaceTo(newpci)
+
+                            result = newpci
+                            XposedBridge.log("[${packageName}] Nr - getPci")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)){
+                            var newstring: String = "-"
+                            replaceTo(newstring)
+
+                            result = newstring
+                            XposedBridge.log("[${packageName}] Nr - toString")
+                        }
+                    }
+                }
+
+            }
         }
 
         "android.location.Location".toClass().apply {
@@ -422,7 +1078,7 @@ object LocationHook : YukiBaseHooker() {
                     if (settings.isStarted && !ignorePkg.contains(packageName)){
                         replaceTo(newlat)
                         result = newlat
-                        XposedBridge.log("[${packageName}] - 'getLatitude' : ${newlat}")
+                        //XposedBridge.log("[${packageName}] - 'getLatitude' : ${newlat}")
                     }
                 }
             }
@@ -438,7 +1094,7 @@ object LocationHook : YukiBaseHooker() {
                     if (settings.isStarted && !ignorePkg.contains(packageName)){
                         replaceTo(newlng)
                         result = newlng
-                        XposedBridge.log("[${packageName}] - 'getLongitude' : ${newlng}")
+                        //XposedBridge.log("[${packageName}] - 'getLongitude' : ${newlng}")
                     }
                 }
             }
@@ -454,7 +1110,7 @@ object LocationHook : YukiBaseHooker() {
                     if (settings.isStarted && !ignorePkg.contains(packageName)){
                         replaceTo(accuracy)
                         result = accuracy
-                        XposedBridge.log("[${packageName}] - 'getAccuracy' : ${accuracy}")
+                        //XposedBridge.log("[${packageName}] - 'getAccuracy' : ${accuracy}")
                     }
                 }
             }
@@ -467,7 +1123,7 @@ object LocationHook : YukiBaseHooker() {
                     if (settings.isStarted && !ignorePkg.contains(packageName)){
                         replaceToFalse()
                         result = false
-                        XposedBridge.log("[${packageName}] - 'isMock' ")
+                        //XposedBridge.log("[${packageName}] - 'isMock' ")
                     }
                 }
             }
@@ -480,7 +1136,7 @@ object LocationHook : YukiBaseHooker() {
                     if (settings.isStarted && !ignorePkg.contains(packageName)){
                         replaceToFalse()
                         result = false
-                        XposedBridge.log("[${packageName}] - 'isFromMockProvider' ")
+                        //XposedBridge.log("[${packageName}] - 'isFromMockProvider' ")
                     }
                 }
             }
@@ -515,7 +1171,7 @@ object LocationHook : YukiBaseHooker() {
                         location.altitude = 0.0
                         location.speed = 0F
                         location.speedAccuracyMetersPerSecond = 0F
-                        XposedBridge.log("[${packageName}] - 'set' lat: ${location.latitude}, lon: ${location.longitude}")
+                        //XposedBridge.log("[${packageName}] - 'set' lat: ${location.latitude}, lon: ${location.longitude}")
 
                         /*
                         try {
