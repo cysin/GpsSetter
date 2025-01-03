@@ -220,10 +220,14 @@ object LocationHook : YukiBaseHooker() {
                 }
             }
 
-            Thread.sleep(3000)
-            callback.onStarted()
-            callback.onSatelliteStatusChanged(mygnssstatus)
-            callback.onFirstFix(1000)
+            Thread {
+                callback.onStarted()
+                callback.onFirstFix(1000)
+                for (i in 1..12) {
+                    callback.onSatelliteStatusChanged(mygnssstatus)
+                    Thread.sleep(800)
+                }
+            }.start()
 
         }
     }
