@@ -4,14 +4,17 @@ import android.annotation.SuppressLint
 import android.app.AndroidAppHelper
 import android.app.PendingIntent
 import android.content.Context
+import android.location.GnssStatus
 import android.os.Message
 import android.location.Location
 import android.os.Bundle
+import android.os.Looper
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiSsid
 import android.net.MacAddress
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.GnssStatus.Callback
 import android.location.LocationRequest
 import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.gsApp
@@ -25,6 +28,7 @@ import com.highcapable.yukihookapi.annotation.xposed.InjectYukiHookWithXposed
 import com.highcapable.yukihookapi.hook.core.annotation.LegacyResourcesHook
 import com.highcapable.yukihookapi.hook.factory.applyModuleTheme
 import com.highcapable.yukihookapi.hook.factory.constructor
+import com.highcapable.yukihookapi.hook.factory.current
 import com.highcapable.yukihookapi.hook.factory.field
 import com.highcapable.yukihookapi.hook.factory.hasMethod
 import com.highcapable.yukihookapi.hook.factory.method
@@ -33,8 +37,10 @@ import com.highcapable.yukihookapi.hook.log.YLog
 import com.highcapable.yukihookapi.hook.type.android.ActivityClass
 import com.highcapable.yukihookapi.hook.type.android.BundleClass
 import com.highcapable.yukihookapi.hook.type.java.ByteArrayType
+import com.highcapable.yukihookapi.hook.type.java.FloatClass
 import com.highcapable.yukihookapi.hook.type.java.IntType
 import com.highcapable.yukihookapi.hook.type.java.ListClass
+import com.highcapable.yukihookapi.hook.type.java.LongClass
 import com.highcapable.yukihookapi.hook.type.java.LongType
 import com.highcapable.yukihookapi.hook.type.java.StringArrayClass
 import com.highcapable.yukihookapi.hook.type.java.StringClass
@@ -50,6 +56,8 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
 import timber.log.Timber
 import java.util.*
 import kotlin.math.cos
+import kotlin.random.Random
+import kotlin.math.roundToInt
 
 object LocationHook : YukiBaseHooker() {
 
@@ -58,23 +66,173 @@ object LocationHook : YukiBaseHooker() {
     var newlng: Double = 74.0060
     private const val pi = 3.14159265359
     private var accuracy : Float = 0.0f
-    private val rand: Random = Random()
+    //private val rand: Random = Random()
     private const val earth = 6378137.0
     private val settings = Xshare()
     var mLastUpdated: Long = 0
-    private const val className = "android.location.Location"
-    //private val ignorePkg = arrayListOf("com.android.location.fused",BuildConfig.APPLICATION_ID)
-    private val ignorePkg = arrayListOf(BuildConfig.APPLICATION_ID)
+    private val ignorePkg = arrayListOf("com.android.location.fused",BuildConfig.APPLICATION_ID)
+    //private val ignorePkg = arrayListOf(BuildConfig.APPLICATION_ID)
 
     private val context by lazy { AndroidAppHelper.currentApplication() as Context }
 
+    private val mygnssstatus:GnssStatus = createRealisticGnssStatus()
 
+
+    private fun <T> List<T>.random(weights: DoubleArray): T {
+        val total = weights.sum()
+        var random = Random.nextDouble() * total
+        for (i in indices) {
+            random -= weights[i]
+            if (random <= 0) return this[i]
+        }
+        return last()
+    }
+
+    private fun createRealisticGnssStatus(numSatellites: Int = Random.nextInt(4, 15)): GnssStatus {
+        val builder = GnssStatus.Builder()
+
+        // Helper function to generate realistic carrier frequencies based on constellation
+        fun getCarrierFrequency(constellation: Int): Float {
+            return when (constellation) {
+                GnssStatus.CONSTELLATION_GPS -> listOf(1575.42f, 1227.60f, 1176.45f).random() // L1, L2, L5
+                GnssStatus.CONSTELLATION_GLONASS -> listOf(1602.0f, 1246.0f).random() // L1, L2
+                GnssStatus.CONSTELLATION_GALILEO -> listOf(1575.42f, 1176.45f).random() // E1, E5a
+                GnssStatus.CONSTELLATION_BEIDOU -> listOf(1561.098f, 1207.140f).random() // B1, B2
+                else -> 1575.42f // Default to GPS L1
+            }
+        }
+
+        // Helper function to generate realistic SVID based on constellation
+        fun getSvidRange(constellation: Int): IntRange {
+            return when (constellation) {
+                GnssStatus.CONSTELLATION_GPS -> 1..32
+                GnssStatus.CONSTELLATION_GLONASS -> 1..24
+                GnssStatus.CONSTELLATION_GALILEO -> 1..36
+                GnssStatus.CONSTELLATION_BEIDOU -> 1..63
+                GnssStatus.CONSTELLATION_QZSS -> 1..10
+                else -> 1..40
+            }
+        }
+
+        // Available constellations with weighted probability
+        val constellations = listOf(
+            GnssStatus.CONSTELLATION_GPS to 0.4,
+            GnssStatus.CONSTELLATION_GLONASS to 0.2,
+            GnssStatus.CONSTELLATION_GALILEO to 0.2,
+            GnssStatus.CONSTELLATION_BEIDOU to 0.15,
+            GnssStatus.CONSTELLATION_QZSS to 0.05
+        )
+
+        // Track used SVIDs per constellation to avoid duplicates
+        val usedSvids = mutableMapOf<Int, MutableSet<Int>>()
+
+        repeat(numSatellites) {
+            // Select constellation based on weighted probability
+            val constellation = constellations.random(
+                weights = constellations.map { it.second }.toDoubleArray()
+            ).first
+
+            // Ensure unique SVID for constellation
+            val svidRange = getSvidRange(constellation)
+            val usedConstellationSvids = usedSvids.getOrPut(constellation) { mutableSetOf() }
+            val svid = (svidRange.toList() - usedConstellationSvids).randomOrNull()
+                ?: svidRange.random() // Fallback if all SVIDs are used
+            usedConstellationSvids.add(svid)
+
+            // Generate realistic signal strength (usually between 20-50 dB-Hz)
+            val cn0DbHz = Random.nextDouble(20.0, 50.0).toFloat()
+
+            // Generate realistic elevation (0-90 degrees)
+            val elevation = Random.nextDouble(0.0, 90.0).toFloat()
+
+            // Generate realistic azimuth (0-360 degrees)
+            val azimuth = Random.nextDouble(0.0, 360.0).toFloat()
+
+            // Satellites with higher elevation and CN0 are more likely to be used in fix
+            val usedInFix = (elevation > 15 && cn0DbHz > 25 && Random.nextDouble() < 0.8)
+
+            // Higher elevation satellites are more likely to have ephemeris and almanac
+            val hasEphemeris = Random.nextDouble() < (0.7 + elevation / 180.0)
+            val hasAlmanac = hasEphemeris || Random.nextDouble() < 0.9
+
+            // Most modern receivers have carrier frequency
+            val hasCarrierFrequency = Random.nextDouble() < 0.95
+            val carrierFrequency = getCarrierFrequency(constellation)
+
+            // Baseband CN0 is usually slightly lower than regular CN0
+            val hasBasebandCn0DbHz = Random.nextDouble() < 0.8
+            val basebandCn0DbHz = (cn0DbHz - Random.nextDouble(1.0, 3.0)).toFloat()
+
+            builder.addSatellite(
+                constellation,
+                svid,
+                cn0DbHz,
+                elevation,
+                azimuth,
+                hasEphemeris,
+                hasAlmanac,
+                usedInFix,
+                hasCarrierFrequency,
+                carrierFrequency,
+                hasBasebandCn0DbHz,
+                basebandCn0DbHz
+            )
+        }
+
+        return builder.build()
+    }
+
+    private fun createLocationListenerRunnable(providerName:String, listener: android.location.LocationListener) = Runnable {
+        while (true) { // Infinite loop to keep printing
+            if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                if (System.currentTimeMillis() - mLastUpdated > 200) {
+                    updateLocation()
+                }
+
+                lateinit var location: Location
+
+                location = Location(providerName)
+                location.time = System.currentTimeMillis() - 300
+                location.accuracy = accuracy
+
+                location.latitude = newlat
+                location.longitude = newlng
+                location.altitude = 0.0
+                location.speed = 0F
+                location.speedAccuracyMetersPerSecond = 0F
+                listener.onLocationChanged(location)
+                //XposedBridge.log("[${packageName}] - 'locationlistener3' onLocationChanged called")
+            }
+            var sleepTime:Long = Random.nextLong(300,2000)
+            Thread.sleep(sleepTime)
+        }
+    }
+
+    private fun createGnssStatusCallback( callback: android.location.GnssStatus.Callback) {
+        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+            val callbackClass = callback::class.java
+            callbackClass.method {
+                name = "onSatelliteStatusChanged"
+            }.hook {
+                before {
+                    args[0] = mygnssstatus
+                    //XposedBridge.log("[${packageName}] - 'onSatelliteStatusChanged' : mygnssstatus")
+                }
+            }
+
+            Thread.sleep(3000)
+            callback.onStarted()
+            callback.onSatelliteStatusChanged(mygnssstatus)
+            callback.onFirstFix(1000)
+
+        }
+    }
 
     private fun updateLocation() {
         try {
             mLastUpdated = System.currentTimeMillis()
-            val x = (rand.nextInt(50) - 15).toDouble()
-            val y = (rand.nextInt(50) - 15).toDouble()
+            val x = (Random.nextInt(30) - 15).toDouble()
+            val y = (Random.nextInt(30) - 15).toDouble()
             val dlat = x / earth
             val dlng = y / (earth * cos(pi * settings.getLat / 180.0))
             newlat = if (settings.isRandomPosition) settings.getLat + (dlat * 180.0 / pi) else settings.getLat
@@ -561,7 +719,6 @@ object LocationHook : YukiBaseHooker() {
 
         }
 
-
         "android.net.wifi.WifiManager".toClass().apply {
             method {
                 name = "getScanResults"
@@ -771,7 +928,123 @@ object LocationHook : YukiBaseHooker() {
 
         }
 
+
         "android.location.LocationManager".toClass().apply {
+            method {
+                name = "registerGnssStatusCallback"
+                param(android.location.GnssStatus.Callback::class.java)
+                returnType = BooleanType
+            }.hook {
+                after {
+                    val callback = args[0] as android.location.GnssStatus.Callback
+                    createGnssStatusCallback(callback)
+
+                }
+            }
+
+            method {
+                name = "registerGnssStatusCallback"
+                param(
+                    android.location.GnssStatus.Callback::class.java,
+                    android.os.Handler::class.java
+                )
+                returnType = BooleanType
+            }.hook {
+                after {
+                    val callback = args[0] as android.location.GnssStatus.Callback
+                    createGnssStatusCallback(callback)
+
+                }
+            }
+
+            method {
+                name = "registerGnssStatusCallback"
+                param(
+                    java.util.concurrent.Executor::class.java,
+                    android.location.GnssStatus.Callback::class.java,
+                )
+                returnType = BooleanType
+            }.hook {
+                after {
+                    val callback = args[1] as android.location.GnssStatus.Callback
+                    createGnssStatusCallback(callback)
+
+                }
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LongType,
+                    FloatType,
+                    LocationListener::class.java
+                )
+            }.hook {
+                after {
+                    val callback = args[3] as android.location.LocationListener
+                    val providername = args[0] as String
+
+                    val thread = Thread(createLocationListenerRunnable(providername, callback))
+                    thread.start()
+
+                }
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LongType,
+                    FloatType,
+                    LocationListener::class.java,
+                    Looper::class.java
+                )
+            }.hook {
+                after {
+                    val callback = args[3] as android.location.LocationListener
+                    val providername = args[0] as String
+                    val thread = Thread(createLocationListenerRunnable(providername, callback))
+                    thread.start()
+                }
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LongType,
+                    FloatType,
+                    java.util.concurrent.Executor::class.java,
+                    LocationListener::class.java,
+
+                )
+            }.hook {
+                after {
+                    val callback = args[4] as android.location.LocationListener
+                    val providername = args[0] as String
+                    val thread = Thread(createLocationListenerRunnable(providername, callback))
+                    thread.start()
+                }
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LocationRequest::class.java,
+                    java.util.concurrent.Executor::class.java,
+                    LocationListener::class.java,
+                    )
+            }.hook {
+                after {
+                    val callback = args[3] as android.location.LocationListener
+                    val providername = args[0] as String
+                    val thread = Thread(createLocationListenerRunnable(providername, callback))
+                    thread.start()
+                }
+            }
+
             method {
                 name = "getLastKnownLocation"
                 param(String::class.java)
