@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import timber.log.Timber
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.cos
 import kotlin.random.Random
 import kotlin.math.roundToInt
@@ -74,9 +75,13 @@ object LocationHook : YukiBaseHooker() {
     //private val ignorePkg = arrayListOf(BuildConfig.APPLICATION_ID)
 
     private val context by lazy { AndroidAppHelper.currentApplication() as Context }
-
     private val mygnssstatus:GnssStatus = createRealisticGnssStatus()
 
+    private val locationListenerThreadMap = ConcurrentHashMap<LocationListener, Thread>()
+    private val locationListenerRunnableMap = ConcurrentHashMap<LocationListener, locationListenerRunnable>()
+
+    private val gnssStatusListenerThreadMap = ConcurrentHashMap<android.location.GnssStatus.Callback, Thread>()
+    private val gnssStatusListenerRunnableMap = ConcurrentHashMap<android.location.GnssStatus.Callback, gnssStatusListenerRunnable>()
 
     private fun <T> List<T>.random(weights: DoubleArray): T {
         val total = weights.sum()
@@ -182,41 +187,130 @@ object LocationHook : YukiBaseHooker() {
         return builder.build()
     }
 
-    private fun createLocationListenerRunnable(providerName:String, listener: android.location.LocationListener) = Runnable {
-        while (true) { // Infinite loop to keep printing
-            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                if (System.currentTimeMillis() - mLastUpdated > 200) {
-                    updateLocation()
+    private class locationListenerRunnable(
+        private val providerName:String,
+        private val listener: android.location.LocationListener
+    ) : Runnable {
+        @Volatile
+        private var isRunning = true
+
+        fun isRunning(): Boolean {
+            return isRunning
+        }
+
+        fun stopThread() {
+            isRunning = false
+        }
+
+        override fun run() {
+            while (isRunning) {
+                try {
+                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+
+                        lateinit var location: Location
+
+                        location = Location(providerName)
+                        location.time = System.currentTimeMillis() - 300
+                        location.accuracy = accuracy
+
+                        location.latitude = newlat
+                        location.longitude = newlng
+                        location.altitude = 0.0
+                        location.speed = 0F
+                        location.speedAccuracyMetersPerSecond = 0F
+                        listener.onLocationChanged(location)
+                        //XposedBridge.log("[${packageName}] - 'locationlistener3' onLocationChanged called")
+                    }
+                    var sleepTime:Long = Random.nextLong(300,2000)
+                    Thread.sleep(sleepTime)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                } catch (e: Exception) {
+                    XposedBridge.log("[${packageName}] - 'locationListenerRunnable' exception ${e}")
                 }
+                // Simulate doing some work
 
-                lateinit var location: Location
-
-                location = Location(providerName)
-                location.time = System.currentTimeMillis() - 300
-                location.accuracy = accuracy
-
-                location.latitude = newlat
-                location.longitude = newlng
-                location.altitude = 0.0
-                location.speed = 0F
-                location.speedAccuracyMetersPerSecond = 0F
-                listener.onLocationChanged(location)
-                //XposedBridge.log("[${packageName}] - 'locationlistener3' onLocationChanged called")
+                //try {
+                //    Thread.sleep(500) // Simulating a task, adjust as needed
+                //} catch (e: InterruptedException) {
+                //    Thread.currentThread().interrupt()
+                //}
             }
-            var sleepTime:Long = Random.nextLong(300,2000)
-            Thread.sleep(sleepTime)
+            XposedBridge.log("[${packageName}] - 'locationListenerRunnable' thread stopped")
         }
     }
+
+    private class gnssStatusListenerRunnable(
+        private val callback: android.location.GnssStatus.Callback,
+    ) : Runnable {
+        @Volatile
+        private var isRunning = true
+
+        fun isRunning(): Boolean {
+            return isRunning
+        }
+
+        fun stopThread() {
+            isRunning = false
+        }
+
+        override fun run() {
+            val callbackClass = callback::class.java
+
+            if(callbackClass.hasMethod {
+                    name = "onSatelliteStatusChanged"
+                }) {
+                callbackClass.method {
+                    name = "onSatelliteStatusChanged"
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            args[0] = mygnssstatus
+                        }
+                        //XposedBridge.log("[${packageName}] - 'onSatelliteStatusChanged' : mygnssstatus")
+                    }
+                }
+            }
+            callback.onStarted()
+            callback.onFirstFix(1000)
+            while (isRunning) {
+                try {
+                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                        callback.onSatelliteStatusChanged(mygnssstatus)
+                    }
+                    var sleepTime:Long = Random.nextLong(300,2000)
+                    Thread.sleep(sleepTime)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                } catch (e: Exception) {
+                    XposedBridge.log("[${packageName}] - 'gnssStatusListenerRunnable' exception ${e}")
+                }
+
+            }
+            XposedBridge.log("[${packageName}] - 'gnssStatusListenerRunnable' thread stopped")
+        }
+    }
+
 
     private fun createGnssStatusCallback( callback: android.location.GnssStatus.Callback) {
         if (settings.isStarted && !ignorePkg.contains(packageName)) {
             val callbackClass = callback::class.java
-            callbackClass.method {
-                name = "onSatelliteStatusChanged"
-            }.hook {
-                before {
-                    args[0] = mygnssstatus
-                    //XposedBridge.log("[${packageName}] - 'onSatelliteStatusChanged' : mygnssstatus")
+
+            if(callbackClass.hasMethod {
+                    name = "onSatelliteStatusChanged"
+                }) {
+                callbackClass.method {
+                    name = "onSatelliteStatusChanged"
+                }.hook {
+                    before {
+                        args[0] = mygnssstatus
+                        //XposedBridge.log("[${packageName}] - 'onSatelliteStatusChanged' : mygnssstatus")
+                    }
                 }
             }
 
@@ -941,7 +1035,16 @@ object LocationHook : YukiBaseHooker() {
             }.hook {
                 after {
                     val callback = args[0] as android.location.GnssStatus.Callback
-                    createGnssStatusCallback(callback)
+                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
+                        val runnable = gnssStatusListenerRunnable(callback)
+                        val thread = Thread(runnable)
+                        gnssStatusListenerRunnableMap[callback] = runnable
+                        gnssStatusListenerThreadMap[callback] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                    }
 
                 }
             }
@@ -956,7 +1059,16 @@ object LocationHook : YukiBaseHooker() {
             }.hook {
                 after {
                     val callback = args[0] as android.location.GnssStatus.Callback
-                    createGnssStatusCallback(callback)
+                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
+                        val runnable = gnssStatusListenerRunnable(callback)
+                        val thread = Thread(runnable)
+                        gnssStatusListenerRunnableMap[callback] = runnable
+                        gnssStatusListenerThreadMap[callback] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                    }
 
                 }
             }
@@ -971,7 +1083,17 @@ object LocationHook : YukiBaseHooker() {
             }.hook {
                 after {
                     val callback = args[1] as android.location.GnssStatus.Callback
-                    createGnssStatusCallback(callback)
+
+                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
+                        val runnable = gnssStatusListenerRunnable(callback)
+                        val thread = Thread(runnable)
+                        gnssStatusListenerRunnableMap[callback] = runnable
+                        gnssStatusListenerThreadMap[callback] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                    }
 
                 }
             }
@@ -986,11 +1108,20 @@ object LocationHook : YukiBaseHooker() {
                 )
             }.hook {
                 after {
-                    val callback = args[3] as android.location.LocationListener
+                    val listener = args[3] as android.location.LocationListener
                     val providername = args[0] as String
 
-                    val thread = Thread(createLocationListenerRunnable(providername, callback))
-                    thread.start()
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+                    }
+
 
                 }
             }
@@ -1006,10 +1137,19 @@ object LocationHook : YukiBaseHooker() {
                 )
             }.hook {
                 after {
-                    val callback = args[3] as android.location.LocationListener
+                    val listener = args[3] as android.location.LocationListener
                     val providername = args[0] as String
-                    val thread = Thread(createLocationListenerRunnable(providername, callback))
-                    thread.start()
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+
+                    }
                 }
             }
 
@@ -1025,10 +1165,19 @@ object LocationHook : YukiBaseHooker() {
                 )
             }.hook {
                 after {
-                    val callback = args[4] as android.location.LocationListener
+                    val listener = args[4] as android.location.LocationListener
                     val providername = args[0] as String
-                    val thread = Thread(createLocationListenerRunnable(providername, callback))
-                    thread.start()
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+
+                    }
                 }
             }
 
@@ -1042,10 +1191,79 @@ object LocationHook : YukiBaseHooker() {
                     )
             }.hook {
                 after {
-                    val callback = args[3] as android.location.LocationListener
+                    val listener = args[3] as android.location.LocationListener
                     val providername = args[0] as String
-                    val thread = Thread(createLocationListenerRunnable(providername, callback))
-                    thread.start()
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+
+                    }
+                }
+            }
+
+            method {
+                name = "removeUpdates"
+                param(
+                    LocationListener::class.java
+                )
+            }.hook {
+                after {
+                    val listener = args[0] as LocationListener
+                    if(locationListenerThreadMap.containsKey(listener) && locationListenerRunnableMap.containsKey(listener)) {
+                        val threadid = locationListenerThreadMap[listener]?.getId()
+                        locationListenerRunnableMap[listener]?.stopThread()
+                        locationListenerThreadMap[listener]?.let { thread ->
+                            try {
+                                // Wait for the thread to finish with a timeout
+                                thread.join(2000)
+                            } catch (e: InterruptedException) {
+                                Thread.currentThread().interrupt()
+                            }
+                        }
+                        locationListenerRunnableMap.remove(listener)
+                        locationListenerThreadMap.remove(listener)
+                        XposedBridge.log("[${packageName}] - stopped locationListener thread: ${threadid}")
+
+                    } else {
+                        XposedBridge.log("[${packageName}] - Error finding locationListener thread or runnable")
+                    }
+
+                }
+            }
+
+            method {
+                name = "unregisterGnssStatusCallback"
+                param(
+                    android.location.GnssStatus.Callback::class.java
+                )
+            }.hook {
+                after {
+                    val callback = args[0] as android.location.GnssStatus.Callback
+                    if(gnssStatusListenerThreadMap.containsKey(callback) && gnssStatusListenerRunnableMap.containsKey(callback)) {
+                        val threadid = gnssStatusListenerThreadMap[callback]?.getId()
+                        gnssStatusListenerRunnableMap[callback]?.stopThread()
+                        gnssStatusListenerThreadMap[callback]?.let { thread ->
+                            try {
+                                // Wait for the thread to finish with a timeout
+                                thread.join(2000)
+                            } catch (e: InterruptedException) {
+                                Thread.currentThread().interrupt()
+                            }
+                        }
+                        gnssStatusListenerRunnableMap.remove(callback)
+                        gnssStatusListenerThreadMap.remove(callback)
+                        XposedBridge.log("[${packageName}] - stopped gnssStatusListener thread: ${threadid}")
+
+                    } else {
+                        XposedBridge.log("[${packageName}] - Error finding gnssStatusListener thread or runnable")
+                    }
+
                 }
             }
 
@@ -1053,8 +1271,8 @@ object LocationHook : YukiBaseHooker() {
                 name = "getLastKnownLocation"
                 param(String::class.java)
             }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200){
+                replaceUnit {
+                    if (System.currentTimeMillis() - mLastUpdated > 200) {
                         updateLocation()
                     }
                     if (settings.isStarted && !ignorePkg.contains(packageName)) {
