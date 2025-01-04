@@ -16,6 +16,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.location.GnssStatus.Callback
 import android.location.LocationRequest
+import android.net.NetworkCapabilities
 import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.gsApp
 import com.cysindex.telequant.xposed.LocationHook.hook
@@ -817,6 +818,54 @@ object LocationHook : YukiBaseHooker() {
 
         }
 
+        "android.net.wifi.WifiInfo".toClass().apply {
+            method {
+                name = "getBSSID"
+                emptyParam()
+                returnType = StringClass
+            }.hook {
+                before {
+                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                        val emptyString = String()
+                        result = emptyString
+                        replaceTo(emptyString)
+                        XposedBridge.log("[${packageName}] - getBSSID")
+                    }
+                }
+            }
+
+            method {
+                name = "getSSID"
+                emptyParam()
+                returnType = StringClass
+            }.hook {
+                before {
+                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                        val emptyString = String()
+                        result = emptyString
+                        replaceTo(emptyString)
+                        XposedBridge.log("[${packageName}] - getSSID")
+                    }
+                }
+            }
+
+            method {
+                name = "toString"
+                emptyParam()
+                returnType = StringClass
+            }.hook {
+                before {
+                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                        val emptyString = String()
+                        result = emptyString
+                        replaceTo(emptyString)
+                        XposedBridge.log("[${packageName}] - toString")
+                    }
+                }
+            }
+
+        }
+
         "android.net.wifi.WifiManager".toClass().apply {
             method {
                 name = "getScanResults"
@@ -1043,7 +1092,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
                     }
 
                 }
@@ -1067,7 +1116,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
                     }
 
                 }
@@ -1092,7 +1141,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
                     }
 
                 }
@@ -1119,7 +1168,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - locationListener thread started : ${threadid}")
                     }
 
 
@@ -1147,7 +1196,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
 
                     }
                 }
@@ -1175,7 +1224,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
 
                     }
                 }
@@ -1201,7 +1250,7 @@ object LocationHook : YukiBaseHooker() {
 
                         thread.start()
                         val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener started thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
 
                     }
                 }
@@ -1228,7 +1277,7 @@ object LocationHook : YukiBaseHooker() {
                         }
                         locationListenerRunnableMap.remove(listener)
                         locationListenerThreadMap.remove(listener)
-                        XposedBridge.log("[${packageName}] - stopped locationListener thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - locationListener thread stopped: ${threadid}")
 
                     } else {
                         XposedBridge.log("[${packageName}] - Error finding locationListener thread or runnable")
@@ -1258,7 +1307,7 @@ object LocationHook : YukiBaseHooker() {
                         }
                         gnssStatusListenerRunnableMap.remove(callback)
                         gnssStatusListenerThreadMap.remove(callback)
-                        XposedBridge.log("[${packageName}] - stopped gnssStatusListener thread: ${threadid}")
+                        XposedBridge.log("[${packageName}] - gnssStatusListener thread stopped: ${threadid}")
 
                     } else {
                         XposedBridge.log("[${packageName}] - Error finding gnssStatusListener thread or runnable")
