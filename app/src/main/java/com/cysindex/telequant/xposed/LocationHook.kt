@@ -1270,8 +1270,9 @@ object LocationHook : YukiBaseHooker() {
             method {
                 name = "getLastKnownLocation"
                 param(String::class.java)
+                returnType = android.location.Location::class.java
             }.hook {
-                replaceUnit {
+                before {
                     if (System.currentTimeMillis() - mLastUpdated > 200) {
                         updateLocation()
                     }
