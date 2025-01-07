@@ -239,7 +239,7 @@ class MapActivity :  MonetCompatActivity() {
 
 
 
-        binding.map.setOnApplyWindowInsetsListener { _, insets ->
+        binding.mapContainer.setOnApplyWindowInsetsListener { _, insets ->
 
             val topInset: Int = insets.systemWindowInsetTop
             val bottomInset: Int = insets.systemWindowInsetBottom
@@ -292,7 +292,7 @@ class MapActivity :  MonetCompatActivity() {
 
     private fun initializeMap() {
         Configuration.getInstance().setUserAgentValue(getPackageName());
-        map = binding.map
+        map = binding.mapContainer
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
 
@@ -305,13 +305,14 @@ class MapActivity :  MonetCompatActivity() {
         // Set up the map
         val mapController = map.controller
         mGeoPoint = GeoPoint(viewModel.getLat, viewModel.getLng)
-        mapController.setZoom(15.0)
+        mapController.setZoom(16.0)
         mapController.setCenter(mGeoPoint)
 
         // Set up marker
         mMarker = Marker(map).apply {
             position = mGeoPoint
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            title = "Lat: ${mGeoPoint?.latitude}, Lon: ${mGeoPoint?.longitude}"
         }
 
         // Handle map clicks
@@ -356,6 +357,7 @@ class MapActivity :  MonetCompatActivity() {
         mGeoPoint = geoPoint
         mMarker?.let { marker ->
             marker.position = geoPoint
+            marker.title = "Lat: ${geoPoint.latitude}, Lon: ${geoPoint.longitude}"
             if (!map.overlays.contains(marker)) {
                 map.overlays.add(marker)
             }
@@ -374,6 +376,7 @@ class MapActivity :  MonetCompatActivity() {
                 map.controller.animateTo(geoPoint)
                 map.controller.setZoom(12.0)
                 mMarker?.position = geoPoint
+                mMarker?.title = "Lat: ${geoPoint.latitude}, Lon: ${geoPoint.longitude}"
                 if (!map.overlays.contains(mMarker)) {
                     map.overlays.add(mMarker)
                 }
