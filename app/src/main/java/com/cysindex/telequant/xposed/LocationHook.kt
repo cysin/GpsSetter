@@ -59,6 +59,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.cos
 import kotlin.random.Random
+import kotlin.math.*
 import kotlin.math.roundToInt
 
 object LocationHook : YukiBaseHooker() {
@@ -83,6 +84,44 @@ object LocationHook : YukiBaseHooker() {
 
     private val gnssStatusListenerThreadMap = ConcurrentHashMap<android.location.GnssStatus.Callback, Thread>()
     private val gnssStatusListenerRunnableMap = ConcurrentHashMap<android.location.GnssStatus.Callback, gnssStatusListenerRunnable>()
+
+    // Constants for the conversion
+    private const val EARTH_RADIUS = 6378245.0 // Semi-major axis
+    private const val EE = 0.00669342162296594323 // Flattening
+
+    // Transform latitude
+    private fun transformLat(x: Double, y: Double): Double {
+        var ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * sqrt(abs(x))
+        ret += (20.0 * sin(6.0 * x * PI) + 20.0 * sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(y * PI) + 40.0 * sin(y / 3.0 * PI)) * 2.0 / 3.0
+        ret += (160.0 * sin(y / 12.0 * PI) + 320 * sin(y * PI / 30.0)) * 2.0 / 3.0
+        return ret
+    }
+
+    // Transform longitude
+    private fun transformLng(x: Double, y: Double): Double {
+        var ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * sqrt(abs(x))
+        ret += (20.0 * sin(6.0 * x * PI) + 20.0 * sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(x * PI) + 40.0 * sin(x / 3.0 * PI)) * 2.0 / 3.0
+        ret += (150.0 * sin(x / 12.0 * PI) + 300.0 * sin(x / 30.0 * PI)) * 2.0 / 3.0
+        return ret
+    }
+
+    // Convert WGS84 to GCJ-02
+    fun wgs84ToGcj02(lat: Double, lng: Double): Pair<Double, Double> {
+        val dLat = transformLat(lng - 105.0, lat - 35.0)
+        val dLng = transformLng(lng - 105.0, lat - 35.0)
+
+        val radLat = lat / 180.0 * PI
+        var magic = sin(radLat)
+        magic = 1 - EE * magic * magic
+        val sqrtMagic = sqrt(magic)
+
+        val mgLat = lat + (dLat * 180.0) / ((EARTH_RADIUS * (1 - EE)) / (magic * sqrtMagic) * PI)
+        val mgLng = lng + (dLng * 180.0) / (EARTH_RADIUS / sqrtMagic * cos(radLat) * PI)
+
+        return Pair(mgLat, mgLng)
+    }
 
     private fun <T> List<T>.random(weights: DoubleArray): T {
         val total = weights.sum()
@@ -336,6 +375,13 @@ object LocationHook : YukiBaseHooker() {
             val dlng = y / (earth * cos(pi * settings.getLat / 180.0))
             newlat = if (settings.isRandomPosition) settings.getLat + (dlat * 180.0 / pi) else settings.getLat
             newlng = if (settings.isRandomPosition) settings.getLng + (dlng * 180.0 / pi) else settings.getLng
+
+            if(true) {
+                val (gcj02Lat, gcj02Lng) = wgs84ToGcj02(newlat, newlng)
+                newlat = gcj02Lat
+                newlng = gcj02Lng
+
+            }
             accuracy = settings.accuracy!!.toFloat()
 
         }catch (e: Exception) {
