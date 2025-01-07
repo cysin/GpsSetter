@@ -1,16 +1,14 @@
 package com.cysindex.telequant.utils.ext
 
-
 import android.content.Context
 import android.location.Geocoder
-import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
+import org.osmdroid.util.GeoPoint
 import java.util.*
 
-suspend fun LatLng.getAddress(context: Context) = callbackFlow {
+suspend fun GeoPoint.getAddress(context: Context) = callbackFlow {
     withContext(Dispatchers.IO){
         val addresses =
             Geocoder(context, Locale.getDefault()).getFromLocation(latitude, longitude, 1)

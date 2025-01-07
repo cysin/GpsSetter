@@ -44,14 +44,7 @@ import com.cysindex.telequant.utils.NotificationsChannel
 import com.cysindex.telequant.utils.PrefManager
 import com.cysindex.telequant.utils.ext.*
 import com.google.android.gms.location.*
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.OnMapReadyCallback
-import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
+
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.elevation.ElevationOverlayProvider
@@ -65,19 +58,25 @@ import java.io.IOException
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import kotlin.properties.Delegates
+import org.osmdroid.views.MapView
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import android.view.MotionEvent
 
 
 @AndroidEntryPoint
-class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener {
+class MapActivity :  MonetCompatActivity() {
 
     private val binding by lazy { ActivityMapBinding.inflate(layoutInflater) }
-    private lateinit var mMap: GoogleMap
+    private lateinit var map: MapView
     private val viewModel by viewModels<MainViewModel>()
     private val update by lazy { viewModel.getAvailableUpdate() }
     private val notificationsChannel by lazy { NotificationsChannel() }
     private var favListAdapter: FavListAdapter = FavListAdapter()
     private var mMarker: Marker? = null
-    private var mLatLng: LatLng? = null
+    private var mGeoPoint: GeoPoint? = null
     private var lat by Delegates.notNull<Double>()
     private var lon by Delegates.notNull<Double>()
     private var xposedDialog: AlertDialog? = null
@@ -139,26 +138,28 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
         binding.bottomSheetContainer.startSpoofing.setOnClickListener {
             viewModel.update(true, lat, lon)
-            mLatLng.let {
-                mMarker?.position = it!!
+            mGeoPoint?.let {
+                mMarker?.position = it
             }
-            mMarker?.isVisible = true
+            showMarker()
             binding.bottomSheetContainer.startSpoofing.visibility = View.GONE
             binding.bottomSheetContainer.stopButton.visibility = View.VISIBLE
             lifecycleScope.launch {
-                mLatLng?.getAddress(this@MapActivity)?.let { address ->
-                    address.collect{ value ->
-                        showStartNotification(value)
+                mGeoPoint?.let {
+                    it.getAddress(this@MapActivity)?.let { address ->
+                        address.collect{ value ->
+                            showStartNotification(value)
+                        }
                     }
                 }
             }
             showToast(getString(R.string.location_set))
         }
         binding.bottomSheetContainer.stopButton.setOnClickListener {
-            mLatLng.let {
-                viewModel.update(false, it!!.latitude, it.longitude)
+            mGeoPoint?.let {
+                viewModel.update(false, it.latitude, it.longitude)
             }
-            mMarker?.isVisible = false
+            hideMarker()
             binding.bottomSheetContainer.stopButton.visibility = View.GONE
             binding.bottomSheetContainer.startSpoofing.visibility = View.VISIBLE
             cancelNotification()
@@ -238,7 +239,7 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
 
 
-        binding.mapContainer.map.setOnApplyWindowInsetsListener { _, insets ->
+        binding.map.setOnApplyWindowInsetsListener { _, insets ->
 
             val topInset: Int = insets.systemWindowInsetTop
             val bottomInset: Int = insets.systemWindowInsetBottom
@@ -290,8 +291,46 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
 
     private fun initializeMap() {
-        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
-        mapFragment?.getMapAsync(this)
+        Configuration.getInstance().setUserAgentValue(getPackageName());
+        map = binding.map
+        map.setTileSource(TileSourceFactory.MAPNIK)
+        map.setMultiTouchControls(true)
+
+        // Add these configuration lines
+        map.isTilesScaledToDpi = true
+        map.setUseDataConnection(true)  // Enable downloading tiles
+        map.setMaxZoomLevel(22.0)  // Most zoomed out
+        map.setMinZoomLevel(1.0) // Most zoomed in
+        
+        // Set up the map
+        val mapController = map.controller
+        mGeoPoint = GeoPoint(viewModel.getLat, viewModel.getLng)
+        mapController.setZoom(15.0)
+        mapController.setCenter(mGeoPoint)
+
+        // Set up marker
+        mMarker = Marker(map).apply {
+            position = mGeoPoint
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        }
+
+        // Handle map clicks
+        map.overlays.add(object : org.osmdroid.views.overlay.Overlay() {
+            override fun onSingleTapConfirmed(e: MotionEvent?, mapView: MapView?): Boolean {
+                if (e != null && mapView != null) {
+                    val proj = mapView.projection
+                    val geoPoint = proj.fromPixels(e.x.toInt(), e.y.toInt())
+                    // Convert IGeoPoint to GeoPoint
+                    onMapClick(GeoPoint(geoPoint.latitude, geoPoint.longitude))
+                }
+                return true
+            }
+        })
+
+        if (viewModel.isStarted) {
+            map.overlays.add(mMarker)
+        }
+        map.invalidate()
     }
 
     private fun isModuleEnable(){
@@ -313,64 +352,40 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
 
 
 
-    override fun onMapReady(googleMap: GoogleMap) {
-        mMap = googleMap
-        with(mMap){
-            mapType = viewModel.mapType
-            val zoom = 12.0f
-            lat = viewModel.getLat
-            lon  = viewModel.getLng
-            mLatLng = LatLng(lat, lon)
-            mLatLng.let {
-                mMarker = addMarker(
-                    MarkerOptions().position(it!!).draggable(false)
-                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)).visible(false)
-                )
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, zoom))
-            }
-            setPadding(0,80,0,170)
-            setOnMapClickListener(this@MapActivity)
-            if (viewModel.isStarted){
-                mMarker?.let {
-                    it.isVisible = true
-                    it.showInfoWindow()
-                }
-            }
-        }
-    }
-
-    override fun onMapClick(latLng: LatLng) {
-        mLatLng = latLng
+    private fun onMapClick(geoPoint: GeoPoint) {
+        mGeoPoint = geoPoint
         mMarker?.let { marker ->
-            mLatLng.let {
-                marker.position = it!!
-                marker.isVisible = true
-                mMap.animateCamera(CameraUpdateFactory.newLatLng(it))
-                lat = it.latitude
-                lon = it.longitude
+            marker.position = geoPoint
+            if (!map.overlays.contains(marker)) {
+                map.overlays.add(marker)
             }
+            map.controller.animateTo(geoPoint)
+            lat = geoPoint.latitude
+            lon = geoPoint.longitude
+            map.invalidate()
         }
     }
 
 
     private fun moveMapToNewLocation(moveNewLocation: Boolean) {
         if (moveNewLocation) {
-            mLatLng = LatLng(lat, lon)
-            mLatLng.let { latLng ->
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng!!, 12.0f))
-                mMarker?.apply {
-                    position = latLng
-                    isVisible = true
-                    showInfoWindow()
+            mGeoPoint = GeoPoint(lat, lon)
+            mGeoPoint?.let { geoPoint ->
+                map.controller.animateTo(geoPoint)
+                map.controller.setZoom(12.0)
+                mMarker?.position = geoPoint
+                if (!map.overlays.contains(mMarker)) {
+                    map.overlays.add(mMarker)
                 }
+                map.invalidate()
             }
         }
-
     }
 
 
     override fun onResume() {
         super.onResume()
+        map.onResume()
         viewModel.updateXposedState()
     }
 
@@ -400,7 +415,7 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
             setTitle(getString(R.string.add_fav_dialog_title))
             setPositiveButton(getString(R.string.dialog_button_add)) { _, _ ->
                 val s = editText.text.toString()
-                if (!mMarker?.isVisible!!){
+                if (!map.overlays.contains(mMarker)) {
                   showToast(getString(R.string.location_not_select))
                 }else{
                     viewModel.storeFavorite(s, lat, lon)
@@ -661,11 +676,24 @@ class MapActivity :  MonetCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapC
         }
     }
 
+    private fun showMarker() {
+        if (mMarker != null && !map.overlays.contains(mMarker)) {
+            map.overlays.add(mMarker)
+            map.invalidate()
+        }
+    }
 
+    private fun hideMarker() {
+        if (mMarker != null) {
+            map.overlays.remove(mMarker)
+            map.invalidate()
+        }
+    }
 
-
-
-
+    override fun onPause() {
+        super.onPause()
+        map.onPause()
+    }
 }
 
 
