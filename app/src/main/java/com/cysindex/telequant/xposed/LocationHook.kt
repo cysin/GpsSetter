@@ -1303,6 +1303,147 @@ object LocationHook : YukiBaseHooker() {
             }
 
             method {
+                name = "requestLocationUpdates"
+                param(
+                    LongType,
+                    FloatType,
+                    android.location.Criteria::class.java,
+                    LocationListener::class.java,
+                    Looper::class.java
+                )
+            }.hook {
+                after {
+                    val listener = args[3] as android.location.LocationListener
+                    val providername = LocationManager.GPS_PROVIDER
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                    }
+                }
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    LongType,
+                    FloatType,
+                    android.location.Criteria::class.java,
+                    java.util.concurrent.Executor::class.java,
+                    LocationListener::class.java,
+                )
+            }.hook {
+                after {
+                    val listener = args[3] as android.location.LocationListener
+                    val providername = LocationManager.GPS_PROVIDER
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                    }
+                }
+            }
+            //-------------------intent---------------
+            // for simplicity all intent related hooks are disabled
+            // as a result this was is affected by settings.start
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LocationRequest::class.java,
+                    android.app.PendingIntent::class.java,
+                )
+            }.hook {
+                replaceUnit {  }
+                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                /*
+                after {
+                    val listener = args[3] as android.location.LocationListener
+                    val providername = args[0] as String
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                    }
+                }*/
+            }
+
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    LongType,
+                    FloatType,
+                    android.location.Criteria::class.java,
+                    android.app.PendingIntent::class.java,
+                )
+            }.hook {
+                replaceUnit {  }
+                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                /*after {
+                    val pintent = args[3] as android.app.PendingIntent
+                    val providername = LocationManager.GPS_PROVIDER
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                    }
+                }*/
+            }
+            method {
+                name = "requestLocationUpdates"
+                param(
+                    StringClass,
+                    LongType,
+                    FloatType,
+                    android.app.PendingIntent::class.java,
+                )
+            }.hook {
+                replaceUnit {  }
+                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                /*
+                after {
+                    val listener = args[3] as android.location.LocationListener
+                    val providername = args[0] as String
+                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
+                        val runnable = locationListenerRunnable(providername, listener)
+                        val thread = Thread(runnable)
+                        locationListenerRunnableMap[listener] = runnable
+                        locationListenerThreadMap[listener] = thread
+
+                        thread.start()
+                        val threadid = thread.getId()
+                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                    }
+                }*/
+            }
+            //----------------end of intent--------------------------------------------------------------
+
+            method {
                 name = "removeUpdates"
                 param(
                     LocationListener::class.java
