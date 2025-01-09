@@ -393,636 +393,622 @@ object LocationHook : YukiBaseHooker() {
 
     @SuppressLint("NewApi")
     override fun onHook() {
-        val settingsClasses = arrayOf(
-            "android.provider.Settings.Secure",
-            "android.provider.Settings.System",
-            "android.provider.Settings.Global",
-            "android.provider.Settings.NameValueCache"
-        )
+        loadApp(isExcludeSelf = true) {
+            val settingsClasses = arrayOf(
+                "android.provider.Settings.Secure",
+                "android.provider.Settings.System",
+                "android.provider.Settings.Global",
+                "android.provider.Settings.NameValueCache"
+            )
 
 
-        settingsClasses.forEach { className ->
-            if (!className.hasClass()) return@forEach
+            settingsClasses.forEach { className ->
+                if (!className.hasClass()) return@forEach
 
-            className.toClass().method {
-                name = "getStringForUser"
-                paramCount = 2  // Assuming method has 2 parameters
-            }.hookAll {
-                replaceUnit {
-                    val name = args[1] as? String
-                    result = when (name) {
-                        "mock_location" -> "0"
-                        else -> try {
-                            callOriginal()
-                        } catch (e: Exception) {
-                            YLog.warn("${className}: hook error $e")
-                            //throwable(e)
-                            //null
+                className.toClass().method {
+                    name = "getStringForUser"
+                    paramCount = 2  // Assuming method has 2 parameters
+                }.hookAll {
+                    replaceUnit {
+                        val name = args[1] as? String
+                        result = when (name) {
+                            "mock_location" -> "0"
+                            else -> try {
+                                callOriginal()
+                            } catch (e: Exception) {
+                                YLog.warn("${className}: hook error $e")
+                                //throwable(e)
+                                //null
+                            }
                         }
                     }
                 }
             }
-        }
 
-        val cellIdClasses = arrayOf(
-            "android.telephony.CellIdentityNr",
-            "android.telephony.CellIdentityGsm",
-            "android.telephony.CellIdentityCdma",
-            "android.telephony.CellIdentityWcdma",
-            "android.telephony.CellIdentityTdscdma",
-            "android.telephony.CellIdentityLte"
-        )
+            val cellIdClasses = arrayOf(
+                "android.telephony.CellIdentityNr",
+                "android.telephony.CellIdentityGsm",
+                "android.telephony.CellIdentityCdma",
+                "android.telephony.CellIdentityWcdma",
+                "android.telephony.CellIdentityTdscdma",
+                "android.telephony.CellIdentityLte"
+            )
 
-        cellIdClasses.forEach { className ->
-            if (!className.hasClass()) return@forEach
+            cellIdClasses.forEach { className ->
+                if (!className.hasClass()) return@forEach
 
-            val cellIDIns = className.toClass()
+                val cellIDIns = className.toClass()
 
-            cellIDIns.apply {
+                cellIDIns.apply {
 
-                if(cellIDIns.hasMethod {
-                        name = "getCid"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
+                    if (cellIDIns.hasMethod {
+                            name = "getCid"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
 
-                    method {
-                        name = "getCid"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newcid: Int = 0
-                                replaceTo(newcid)
+                        method {
+                            name = "getCid"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newcid: Int = 0
+                                    replaceTo(newcid)
 
-                                result = newcid
-                                XposedBridge.log("[${packageName}] ${className} - getCid")
+                                    result = newcid
+                                    XposedBridge.log("[${packageName}] ${className} - getCid")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getCi"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
+                    if (cellIDIns.hasMethod {
+                            name = "getCi"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
 
-                    method {
-                        name = "getCi"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newci: Int = 0
-                                replaceTo(newci)
+                        method {
+                            name = "getCi"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newci: Int = 0
+                                    replaceTo(newci)
 
-                                result = newci
-                                XposedBridge.log("[${packageName}] ${className} - getCi")
+                                    result = newci
+                                    XposedBridge.log("[${packageName}] ${className} - getCi")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getNci"
-                        emptyParam()
-                        returnType = LongType
-                    }) {
-                    method {
-                        name = "getNci"
-                        emptyParam()
-                        returnType = LongType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newcid: Long = 0
-                                replaceTo(newcid)
+                    if (cellIDIns.hasMethod {
+                            name = "getNci"
+                            emptyParam()
+                            returnType = LongType
+                        }) {
+                        method {
+                            name = "getNci"
+                            emptyParam()
+                            returnType = LongType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newcid: Long = 0
+                                    replaceTo(newcid)
 
-                                result = newcid
-                                XposedBridge.log("[${packageName}] ${className} - getNci")
+                                    result = newcid
+                                    XposedBridge.log("[${packageName}] ${className} - getNci")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getMcc"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getMcc"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newmcc: Int = 460
-                                replaceTo(newmcc)
+                    if (cellIDIns.hasMethod {
+                            name = "getMcc"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getMcc"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newmcc: Int = 460
+                                    replaceTo(newmcc)
 
-                                result = newmcc
-                                XposedBridge.log("[${packageName}] ${className} - getMcc")
+                                    result = newmcc
+                                    XposedBridge.log("[${packageName}] ${className} - getMcc")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getMccString"
-                        emptyParam()
-                        returnType = StringClass
-                    }) {
-                    method {
-                        name = "getMccString"
-                        emptyParam()
-                        returnType = StringClass
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newmccstring: String = "460"
-                                replaceTo(newmccstring)
+                    if (cellIDIns.hasMethod {
+                            name = "getMccString"
+                            emptyParam()
+                            returnType = StringClass
+                        }) {
+                        method {
+                            name = "getMccString"
+                            emptyParam()
+                            returnType = StringClass
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newmccstring: String = "460"
+                                    replaceTo(newmccstring)
 
-                                result = newmccstring
-                                XposedBridge.log("[${packageName}] ${className} - getMccString")
+                                    result = newmccstring
+                                    XposedBridge.log("[${packageName}] ${className} - getMccString")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getMnc"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getMnc"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newmnc: Int = 0
-                                replaceTo(newmnc)
+                    if (cellIDIns.hasMethod {
+                            name = "getMnc"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getMnc"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newmnc: Int = 0
+                                    replaceTo(newmnc)
 
-                                result = newmnc
-                                XposedBridge.log("[${packageName}] ${className} - getMnc")
+                                    result = newmnc
+                                    XposedBridge.log("[${packageName}] ${className} - getMnc")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getMncString"
-                        emptyParam()
-                        returnType = StringClass
-                    }) {
-                    method {
-                        name = "getMncString"
-                        emptyParam()
-                        returnType = StringClass
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newmncstring: String = "00"
-                                replaceTo(newmncstring)
+                    if (cellIDIns.hasMethod {
+                            name = "getMncString"
+                            emptyParam()
+                            returnType = StringClass
+                        }) {
+                        method {
+                            name = "getMncString"
+                            emptyParam()
+                            returnType = StringClass
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newmncstring: String = "00"
+                                    replaceTo(newmncstring)
 
-                                result = newmncstring
-                                XposedBridge.log("[${packageName}] ${className} - getMncString")
+                                    result = newmncstring
+                                    XposedBridge.log("[${packageName}] ${className} - getMncString")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getLac"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getLac"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newlac: Int = 0//6815749
-                                replaceTo(newlac)
+                    if (cellIDIns.hasMethod {
+                            name = "getLac"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getLac"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newlac: Int = 0//6815749
+                                    replaceTo(newlac)
 
-                                result = newlac
-                                XposedBridge.log("[${packageName}] ${className} - getLac")
+                                    result = newlac
+                                    XposedBridge.log("[${packageName}] ${className} - getLac")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getPsc"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getPsc"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newpsc: Int = 0//999
-                                replaceTo(newpsc)
+                    if (cellIDIns.hasMethod {
+                            name = "getPsc"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getPsc"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newpsc: Int = 0//999
+                                    replaceTo(newpsc)
 
-                                result = newpsc
-                                XposedBridge.log("[${packageName}] ${className} - getPsc")
+                                    result = newpsc
+                                    XposedBridge.log("[${packageName}] ${className} - getPsc")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getBsic"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getBsic"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newbsic: Int = 0//999
-                                replaceTo(newbsic)
+                    if (cellIDIns.hasMethod {
+                            name = "getBsic"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getBsic"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newbsic: Int = 0//999
+                                    replaceTo(newbsic)
 
-                                result = newbsic
-                                XposedBridge.log("[${packageName}] ${className} - getBsic")
+                                    result = newbsic
+                                    XposedBridge.log("[${packageName}] ${className} - getBsic")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "toString"
-                        emptyParam()
-                        returnType = StringClass
-                    }) {
-                    method {
-                        name = "toString"
-                        emptyParam()
-                        returnType = StringClass
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newstring: String = "-"
-                                replaceTo(newstring)
+                    if (cellIDIns.hasMethod {
+                            name = "toString"
+                            emptyParam()
+                            returnType = StringClass
+                        }) {
+                        method {
+                            name = "toString"
+                            emptyParam()
+                            returnType = StringClass
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newstring: String = "-"
+                                    replaceTo(newstring)
 
-                                result = newstring
-                                XposedBridge.log("[${packageName}] ${className} - toString")
+                                    result = newstring
+                                    XposedBridge.log("[${packageName}] ${className} - toString")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getBasestationId"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getBasestationId"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newid: Int = 0
-                                replaceTo(newid)
+                    if (cellIDIns.hasMethod {
+                            name = "getBasestationId"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getBasestationId"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newid: Int = 0
+                                    replaceTo(newid)
 
-                                result = newid
-                                XposedBridge.log("[${packageName}] ${className} - getBasestationId")
+                                    result = newid
+                                    XposedBridge.log("[${packageName}] ${className} - getBasestationId")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getLatitude"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getLatitude"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newid: Int = 0
-                                replaceTo(newid)
+                    if (cellIDIns.hasMethod {
+                            name = "getLatitude"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getLatitude"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newid: Int = 0
+                                    replaceTo(newid)
 
-                                result = newid
-                                XposedBridge.log("[${packageName}] ${className} - getLatitude")
+                                    result = newid
+                                    XposedBridge.log("[${packageName}] ${className} - getLatitude")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getLongitude"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getLongitude"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newid: Int = 0
-                                replaceTo(newid)
+                    if (cellIDIns.hasMethod {
+                            name = "getLongitude"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getLongitude"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newid: Int = 0
+                                    replaceTo(newid)
 
-                                result = newid
-                                XposedBridge.log("[${packageName}] ${className} - getLongitude")
+                                    result = newid
+                                    XposedBridge.log("[${packageName}] ${className} - getLongitude")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getNetworkId"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getNetworkId"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newid: Int = 0
-                                replaceTo(newid)
+                    if (cellIDIns.hasMethod {
+                            name = "getNetworkId"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getNetworkId"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newid: Int = 0
+                                    replaceTo(newid)
 
-                                result = newid
-                                XposedBridge.log("[${packageName}] ${className} - getNetworkId")
+                                    result = newid
+                                    XposedBridge.log("[${packageName}] ${className} - getNetworkId")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getSystemId"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getSystemId"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                val newid: Int = 0
-                                replaceTo(newid)
+                    if (cellIDIns.hasMethod {
+                            name = "getSystemId"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getSystemId"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    val newid: Int = 0
+                                    replaceTo(newid)
 
-                                result = newid
-                                XposedBridge.log("[${packageName}] ${className} - getSystemId")
+                                    result = newid
+                                    XposedBridge.log("[${packageName}] ${className} - getSystemId")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getCpid"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getCpid"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newcpid: Int = 0//999
-                                replaceTo(newcpid)
+                    if (cellIDIns.hasMethod {
+                            name = "getCpid"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getCpid"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newcpid: Int = 0//999
+                                    replaceTo(newcpid)
 
-                                result = newcpid
-                                XposedBridge.log("[${packageName}] ${className} - getCpid")
+                                    result = newcpid
+                                    XposedBridge.log("[${packageName}] ${className} - getCpid")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getPci"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getPci"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newpci: Int = 0//999
-                                replaceTo(newpci)
+                    if (cellIDIns.hasMethod {
+                            name = "getPci"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getPci"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newpci: Int = 0//999
+                                    replaceTo(newpci)
 
-                                result = newpci
-                                XposedBridge.log("[${packageName}] ${className} - getPci")
+                                    result = newpci
+                                    XposedBridge.log("[${packageName}] ${className} - getPci")
+                                }
                             }
                         }
                     }
-                }
 
-                if(cellIDIns.hasMethod {
-                        name = "getTac"
-                        emptyParam()
-                        returnType = IntType
-                    }) {
-                    method {
-                        name = "getTac"
-                        emptyParam()
-                        returnType = IntType
-                    }.hook {
-                        before {
-                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                                var newtac: Int = 0//6815749
-                                replaceTo(newtac)
+                    if (cellIDIns.hasMethod {
+                            name = "getTac"
+                            emptyParam()
+                            returnType = IntType
+                        }) {
+                        method {
+                            name = "getTac"
+                            emptyParam()
+                            returnType = IntType
+                        }.hook {
+                            before {
+                                if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                    var newtac: Int = 0//6815749
+                                    replaceTo(newtac)
 
-                                result = newtac
-                                XposedBridge.log("[${packageName}] ${className} - getTac")
+                                    result = newtac
+                                    XposedBridge.log("[${packageName}] ${className} - getTac")
+                                }
                             }
                         }
                     }
-                }
 
-            } //className.toClass().apply
+                } //className.toClass().apply
 
-        }
-
-        "android.net.wifi.WifiInfo".toClass().apply {
-            method {
-                name = "getBSSID"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        val emptyString = String()
-                        result = emptyString
-                        replaceTo(emptyString)
-                        XposedBridge.log("[${packageName}] - getBSSID")
-                    }
-                }
             }
 
-            method {
-                name = "getSSID"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        val emptyString = String()
-                        result = emptyString
-                        replaceTo(emptyString)
-                        XposedBridge.log("[${packageName}] - getSSID")
-                    }
-                }
-            }
-
-            method {
-                name = "toString"
-                emptyParam()
-                returnType = StringClass
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        val emptyString = String()
-                        result = emptyString
-                        replaceTo(emptyString)
-                        XposedBridge.log("[${packageName}] - toString")
-                    }
-                }
-            }
-
-        }
-
-        "android.net.wifi.WifiManager".toClass().apply {
-            method {
-                name = "getScanResults"
-                emptyParam()
-                returnType = ListClass
-            }.hook {
-                before {
-                    if(settings.isStarted && !ignorePkg.contains(packageName)) {
-                        val emptyList = emptyList<ScanResult>()
-                        replaceTo(emptyList)
-                        result = emptyList
-                        XposedBridge.log("[${packageName}] - getScanResults")
-
-                    }
-                }
-            }
-        }
-
-        val locationIns = "android.location.Location".toClass()
-        locationIns.apply {
-            method {
-                name = "getLatitude"
-                returnType = DoubleType
-            }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200){
-                        updateLocation()
-                    }
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        replaceTo(newlat)
-                        result = newlat
-                        //XposedBridge.log("[${packageName}] - 'getLatitude' : ${newlat}")
-                    }
-                }
-            }
-
-            method {
-                name = "getLongitude"
-                returnType = DoubleType
-            }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200){
-                        updateLocation()
-                    }
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        replaceTo(newlng)
-                        result = newlng
-                        //XposedBridge.log("[${packageName}] - 'getLongitude' : ${newlng}")
-                    }
-                }
-            }
-
-            method {
-                name = "getAccuracy"
-                returnType = FloatType
-            }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200){
-                        updateLocation()
-                    }
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        replaceTo(accuracy)
-                        result = accuracy
-                        //XposedBridge.log("[${packageName}] - 'getAccuracy' : ${accuracy}")
-                    }
-                }
-            }
-
-            method {
-                name = "isMock"
-                returnType = BooleanType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        replaceToFalse()
-                        result = false
-                        //XposedBridge.log("[${packageName}] - 'isMock' ")
-                    }
-                }
-            }
-
-            method {
-                name = "isFromMockProvider"
-                returnType = BooleanType
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        replaceToFalse()
-                        result = false
-                        //XposedBridge.log("[${packageName}] - 'isFromMockProvider' ")
-                    }
-                }
-            }
-
-            method {
-                name = "setMock"
-                param(BooleanType)
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        args[0] = false
-                    }
-                }
-            }
-
-            if(locationIns.hasMethod {
-                    name = "setIsFromMockProvider"
-                    param(BooleanType)
-                }) {
+            "android.net.wifi.WifiInfo".toClass().apply {
                 method {
-                    name = "setIsFromMockProvider"
+                    name = "getBSSID"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            val emptyString = String()
+                            result = emptyString
+                            replaceTo(emptyString)
+                            XposedBridge.log("[${packageName}] - getBSSID")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getSSID"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            val emptyString = String()
+                            result = emptyString
+                            replaceTo(emptyString)
+                            XposedBridge.log("[${packageName}] - getSSID")
+                        }
+                    }
+                }
+
+                method {
+                    name = "toString"
+                    emptyParam()
+                    returnType = StringClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            val emptyString = String()
+                            result = emptyString
+                            replaceTo(emptyString)
+                            XposedBridge.log("[${packageName}] - toString")
+                        }
+                    }
+                }
+
+            }
+
+            "android.net.wifi.WifiManager".toClass().apply {
+                method {
+                    name = "getScanResults"
+                    emptyParam()
+                    returnType = ListClass
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            val emptyList = emptyList<ScanResult>()
+                            replaceTo(emptyList)
+                            result = emptyList
+                            XposedBridge.log("[${packageName}] - getScanResults")
+
+                        }
+                    }
+                }
+            }
+
+            val locationIns = "android.location.Location".toClass()
+            locationIns.apply {
+                method {
+                    name = "getLatitude"
+                    returnType = DoubleType
+                }.hook {
+                    before {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            replaceTo(newlat)
+                            result = newlat
+                            //XposedBridge.log("[${packageName}] - 'getLatitude' : ${newlat}")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getLongitude"
+                    returnType = DoubleType
+                }.hook {
+                    before {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            replaceTo(newlng)
+                            result = newlng
+                            //XposedBridge.log("[${packageName}] - 'getLongitude' : ${newlng}")
+                        }
+                    }
+                }
+
+                method {
+                    name = "getAccuracy"
+                    returnType = FloatType
+                }.hook {
+                    before {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            replaceTo(accuracy)
+                            result = accuracy
+                            //XposedBridge.log("[${packageName}] - 'getAccuracy' : ${accuracy}")
+                        }
+                    }
+                }
+
+                method {
+                    name = "isMock"
+                    returnType = BooleanType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            replaceToFalse()
+                            result = false
+                            //XposedBridge.log("[${packageName}] - 'isMock' ")
+                        }
+                    }
+                }
+
+                method {
+                    name = "isFromMockProvider"
+                    returnType = BooleanType
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            replaceToFalse()
+                            result = false
+                            //XposedBridge.log("[${packageName}] - 'isFromMockProvider' ")
+                        }
+                    }
+                }
+
+                method {
+                    name = "setMock"
                     param(BooleanType)
                 }.hook {
                     before {
@@ -1031,72 +1017,89 @@ object LocationHook : YukiBaseHooker() {
                         }
                     }
                 }
-            }
 
-            method {
-                name = "getExtras"
-                returnType = Bundle::class.java
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        var bundle = callOriginal() as? Bundle
-                        if (bundle?.containsKey("mockLocation") == true) {
-                            bundle.putBoolean("mockLocation", false)
+                if (locationIns.hasMethod {
+                        name = "setIsFromMockProvider"
+                        param(BooleanType)
+                    }) {
+                    method {
+                        name = "setIsFromMockProvider"
+                        param(BooleanType)
+                    }.hook {
+                        before {
+                            if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                                args[0] = false
+                            }
                         }
-                        replaceTo(bundle)
-                        result = bundle
                     }
                 }
-            }
 
-            method {
-                name = "setExtras"
-                param(Bundle::class.java)
-            }.hook {
-                before {
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        var bundle = args(0).any() as Bundle
-                        if (bundle?.containsKey("mockLocation") == true) {
-                            bundle.putBoolean("mockLocation", false)
+                method {
+                    name = "getExtras"
+                    returnType = Bundle::class.java
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            var bundle = callOriginal() as? Bundle
+                            if (bundle?.containsKey("mockLocation") == true) {
+                                bundle.putBoolean("mockLocation", false)
+                            }
+                            replaceTo(bundle)
+                            result = bundle
                         }
-                        args[0] = bundle
                     }
                 }
-            }
 
-            method {
-                name = "set"
-                param(Location::class.java)
-            }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200){
-                        updateLocation()
-                    }
-                    if (settings.isStarted && !ignorePkg.contains(packageName)){
-                        lateinit var location: Location
-                        lateinit var originLocation: Location
-                        if (args[0] == null){
-                            location = Location(LocationManager.GPS_PROVIDER)
-                            location.time = System.currentTimeMillis() - 300
-                        }else {
-                            originLocation = args(0).any() as Location
-                            location = Location(originLocation.provider)
-                            location.time = originLocation.time
-                            location.accuracy = accuracy
-                            location.bearing = originLocation.bearing
-                            location.bearingAccuracyDegrees = originLocation.bearingAccuracyDegrees
-                            location.elapsedRealtimeNanos = originLocation.elapsedRealtimeNanos
-                            location.verticalAccuracyMeters = originLocation.verticalAccuracyMeters
+                method {
+                    name = "setExtras"
+                    param(Bundle::class.java)
+                }.hook {
+                    before {
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            var bundle = args(0).any() as Bundle
+                            if (bundle?.containsKey("mockLocation") == true) {
+                                bundle.putBoolean("mockLocation", false)
+                            }
+                            args[0] = bundle
                         }
+                    }
+                }
 
-                        location.latitude = newlat
-                        location.longitude = newlng
-                        location.altitude = 0.0
-                        location.speed = 0F
-                        location.speedAccuracyMetersPerSecond = 0F
-                        //XposedBridge.log("[${packageName}] - 'set' lat: ${location.latitude}, lon: ${location.longitude}")
+                method {
+                    name = "set"
+                    param(Location::class.java)
+                }.hook {
+                    before {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            lateinit var location: Location
+                            lateinit var originLocation: Location
+                            if (args[0] == null) {
+                                location = Location(LocationManager.GPS_PROVIDER)
+                                location.time = System.currentTimeMillis() - 300
+                            } else {
+                                originLocation = args(0).any() as Location
+                                location = Location(originLocation.provider)
+                                location.time = originLocation.time
+                                location.accuracy = accuracy
+                                location.bearing = originLocation.bearing
+                                location.bearingAccuracyDegrees =
+                                    originLocation.bearingAccuracyDegrees
+                                location.elapsedRealtimeNanos = originLocation.elapsedRealtimeNanos
+                                location.verticalAccuracyMeters =
+                                    originLocation.verticalAccuracyMeters
+                            }
 
-                        /*
+                            location.latitude = newlat
+                            location.longitude = newlng
+                            location.altitude = 0.0
+                            location.speed = 0F
+                            location.speedAccuracyMetersPerSecond = 0F
+                            //XposedBridge.log("[${packageName}] - 'set' lat: ${location.latitude}, lon: ${location.longitude}")
+
+                            /*
                         try {
                             HiddenApiBypass.invoke(
                                 location.javaClass,
@@ -1110,265 +1113,292 @@ object LocationHook : YukiBaseHooker() {
                         }
                         */
 
-                        //args().first().set(location)
-                        args[0] = location
+                            //args().first().set(location)
+                            args[0] = location
 
+                        }
                     }
+
                 }
+
 
             }
 
 
-        }
+            "android.location.LocationManager".toClass().apply {
+                method {
+                    name = "registerGnssStatusCallback"
+                    param(android.location.GnssStatus.Callback::class.java)
+                    returnType = BooleanType
+                }.hook {
+                    after {
+                        val callback = args[0] as android.location.GnssStatus.Callback
+                        if (!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(
+                                callback
+                            )
+                        ) {
+                            val runnable = gnssStatusListenerRunnable(callback)
+                            val thread = Thread(runnable)
+                            gnssStatusListenerRunnableMap[callback] = runnable
+                            gnssStatusListenerThreadMap[callback] = thread
 
-
-        "android.location.LocationManager".toClass().apply {
-            method {
-                name = "registerGnssStatusCallback"
-                param(android.location.GnssStatus.Callback::class.java)
-                returnType = BooleanType
-            }.hook {
-                after {
-                    val callback = args[0] as android.location.GnssStatus.Callback
-                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
-                        val runnable = gnssStatusListenerRunnable(callback)
-                        val thread = Thread(runnable)
-                        gnssStatusListenerRunnableMap[callback] = runnable
-                        gnssStatusListenerThreadMap[callback] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
-                    }
-
-                }
-            }
-
-            method {
-                name = "registerGnssStatusCallback"
-                param(
-                    android.location.GnssStatus.Callback::class.java,
-                    android.os.Handler::class.java
-                )
-                returnType = BooleanType
-            }.hook {
-                after {
-                    val callback = args[0] as android.location.GnssStatus.Callback
-                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
-                        val runnable = gnssStatusListenerRunnable(callback)
-                        val thread = Thread(runnable)
-                        gnssStatusListenerRunnableMap[callback] = runnable
-                        gnssStatusListenerThreadMap[callback] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
-                    }
-
-                }
-            }
-
-            method {
-                name = "registerGnssStatusCallback"
-                param(
-                    java.util.concurrent.Executor::class.java,
-                    android.location.GnssStatus.Callback::class.java,
-                )
-                returnType = BooleanType
-            }.hook {
-                after {
-                    val callback = args[1] as android.location.GnssStatus.Callback
-
-                    if(!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(callback)) {
-                        val runnable = gnssStatusListenerRunnable(callback)
-                        val thread = Thread(runnable)
-                        gnssStatusListenerRunnableMap[callback] = runnable
-                        gnssStatusListenerThreadMap[callback] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
-                    }
-
-                }
-            }
-
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LongType,
-                    FloatType,
-                    LocationListener::class.java
-                )
-            }.hook {
-                after {
-                    val listener = args[3] as android.location.LocationListener
-                    val providername = args[0] as String
-
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started : ${threadid}")
-                    }
-
-
-                }
-            }
-
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LongType,
-                    FloatType,
-                    LocationListener::class.java,
-                    Looper::class.java
-                )
-            }.hook {
-                after {
-                    val listener = args[3] as android.location.LocationListener
-                    val providername = args[0] as String
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
+                        }
 
                     }
                 }
-            }
 
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LongType,
-                    FloatType,
-                    java.util.concurrent.Executor::class.java,
-                    LocationListener::class.java,
-
-                )
-            }.hook {
-                after {
-                    val listener = args[4] as android.location.LocationListener
-                    val providername = args[0] as String
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
-
-                    }
-                }
-            }
-
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LocationRequest::class.java,
-                    java.util.concurrent.Executor::class.java,
-                    LocationListener::class.java,
+                method {
+                    name = "registerGnssStatusCallback"
+                    param(
+                        android.location.GnssStatus.Callback::class.java,
+                        android.os.Handler::class.java
                     )
-            }.hook {
-                after {
-                    val listener = args[3] as android.location.LocationListener
-                    val providername = args[0] as String
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
+                    returnType = BooleanType
+                }.hook {
+                    after {
+                        val callback = args[0] as android.location.GnssStatus.Callback
+                        if (!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(
+                                callback
+                            )
+                        ) {
+                            val runnable = gnssStatusListenerRunnable(callback)
+                            val thread = Thread(runnable)
+                            gnssStatusListenerRunnableMap[callback] = runnable
+                            gnssStatusListenerThreadMap[callback] = thread
 
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
-
-                    }
-                }
-            }
-
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    LongType,
-                    FloatType,
-                    android.location.Criteria::class.java,
-                    LocationListener::class.java,
-                    Looper::class.java
-                )
-            }.hook {
-                after {
-                    val listener = args[3] as android.location.LocationListener
-                    val providername = LocationManager.GPS_PROVIDER
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
-
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
+                        }
 
                     }
                 }
-            }
 
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    LongType,
-                    FloatType,
-                    android.location.Criteria::class.java,
-                    java.util.concurrent.Executor::class.java,
-                    LocationListener::class.java,
-                )
-            }.hook {
-                after {
-                    val listener = args[3] as android.location.LocationListener
-                    val providername = LocationManager.GPS_PROVIDER
-                    if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
-                        val runnable = locationListenerRunnable(providername, listener)
-                        val thread = Thread(runnable)
-                        locationListenerRunnableMap[listener] = runnable
-                        locationListenerThreadMap[listener] = thread
+                method {
+                    name = "registerGnssStatusCallback"
+                    param(
+                        java.util.concurrent.Executor::class.java,
+                        android.location.GnssStatus.Callback::class.java,
+                    )
+                    returnType = BooleanType
+                }.hook {
+                    after {
+                        val callback = args[1] as android.location.GnssStatus.Callback
 
-                        thread.start()
-                        val threadid = thread.getId()
-                        XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+                        if (!gnssStatusListenerThreadMap.containsKey(callback) || !gnssStatusListenerRunnableMap.containsKey(
+                                callback
+                            )
+                        ) {
+                            val runnable = gnssStatusListenerRunnable(callback)
+                            val thread = Thread(runnable)
+                            gnssStatusListenerRunnableMap[callback] = runnable
+                            gnssStatusListenerThreadMap[callback] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - gnssStatusListener thread started: ${threadid}")
+                        }
 
                     }
                 }
-            }
-            //-------------------intent---------------
-            // for simplicity all intent related hooks are disabled
-            // as a result this was is affected by settings.start
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LocationRequest::class.java,
-                    android.app.PendingIntent::class.java,
-                )
-            }.hook {
-                replaceUnit {  }
-                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
-                /*
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LongType,
+                        FloatType,
+                        LocationListener::class.java
+                    )
+                }.hook {
+                    after {
+                        val listener = args[3] as android.location.LocationListener
+                        val providername = args[0] as String
+
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started : ${threadid}")
+                        }
+
+
+                    }
+                }
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LongType,
+                        FloatType,
+                        LocationListener::class.java,
+                        Looper::class.java
+                    )
+                }.hook {
+                    after {
+                        val listener = args[3] as android.location.LocationListener
+                        val providername = args[0] as String
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                        }
+                    }
+                }
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LongType,
+                        FloatType,
+                        java.util.concurrent.Executor::class.java,
+                        LocationListener::class.java,
+
+                        )
+                }.hook {
+                    after {
+                        val listener = args[4] as android.location.LocationListener
+                        val providername = args[0] as String
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                        }
+                    }
+                }
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LocationRequest::class.java,
+                        java.util.concurrent.Executor::class.java,
+                        LocationListener::class.java,
+                    )
+                }.hook {
+                    after {
+                        val listener = args[3] as android.location.LocationListener
+                        val providername = args[0] as String
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                        }
+                    }
+                }
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        LongType,
+                        FloatType,
+                        android.location.Criteria::class.java,
+                        LocationListener::class.java,
+                        Looper::class.java
+                    )
+                }.hook {
+                    after {
+                        val listener = args[3] as android.location.LocationListener
+                        val providername = LocationManager.GPS_PROVIDER
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                        }
+                    }
+                }
+
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        LongType,
+                        FloatType,
+                        android.location.Criteria::class.java,
+                        java.util.concurrent.Executor::class.java,
+                        LocationListener::class.java,
+                    )
+                }.hook {
+                    after {
+                        val listener = args[3] as android.location.LocationListener
+                        val providername = LocationManager.GPS_PROVIDER
+                        if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val runnable = locationListenerRunnable(providername, listener)
+                            val thread = Thread(runnable)
+                            locationListenerRunnableMap[listener] = runnable
+                            locationListenerThreadMap[listener] = thread
+
+                            thread.start()
+                            val threadid = thread.getId()
+                            XposedBridge.log("[${packageName}] - locationListener thread started: ${threadid}")
+
+                        }
+                    }
+                }
+                //-------------------intent---------------
+                // for simplicity all intent related hooks are disabled
+                // as a result this was is affected by settings.start
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LocationRequest::class.java,
+                        android.app.PendingIntent::class.java,
+                    )
+                }.hook {
+                    replaceUnit { }
+                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    /*
                 after {
                     val listener = args[3] as android.location.LocationListener
                     val providername = args[0] as String
@@ -1384,20 +1414,20 @@ object LocationHook : YukiBaseHooker() {
 
                     }
                 }*/
-            }
+                }
 
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    LongType,
-                    FloatType,
-                    android.location.Criteria::class.java,
-                    android.app.PendingIntent::class.java,
-                )
-            }.hook {
-                replaceUnit {  }
-                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
-                /*after {
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        LongType,
+                        FloatType,
+                        android.location.Criteria::class.java,
+                        android.app.PendingIntent::class.java,
+                    )
+                }.hook {
+                    replaceUnit { }
+                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    /*after {
                     val pintent = args[3] as android.app.PendingIntent
                     val providername = LocationManager.GPS_PROVIDER
                     if(!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(listener)) {
@@ -1412,19 +1442,19 @@ object LocationHook : YukiBaseHooker() {
 
                     }
                 }*/
-            }
-            method {
-                name = "requestLocationUpdates"
-                param(
-                    StringClass,
-                    LongType,
-                    FloatType,
-                    android.app.PendingIntent::class.java,
-                )
-            }.hook {
-                replaceUnit {  }
-                XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
-                /*
+                }
+                method {
+                    name = "requestLocationUpdates"
+                    param(
+                        StringClass,
+                        LongType,
+                        FloatType,
+                        android.app.PendingIntent::class.java,
+                    )
+                }.hook {
+                    replaceUnit { }
+                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    /*
                 after {
                     val listener = args[3] as android.location.LocationListener
                     val providername = args[0] as String
@@ -1440,90 +1470,96 @@ object LocationHook : YukiBaseHooker() {
 
                     }
                 }*/
-            }
-            //----------------end of intent--------------------------------------------------------------
-
-            method {
-                name = "removeUpdates"
-                param(
-                    LocationListener::class.java
-                )
-            }.hook {
-                after {
-                    val listener = args[0] as LocationListener
-                    if(locationListenerThreadMap.containsKey(listener) && locationListenerRunnableMap.containsKey(listener)) {
-                        val threadid = locationListenerThreadMap[listener]?.getId()
-                        locationListenerRunnableMap[listener]?.stopThread()
-                        locationListenerThreadMap[listener]?.let { thread ->
-                            try {
-                                // Wait for the thread to finish with a timeout
-                                thread.join(2000)
-                            } catch (e: InterruptedException) {
-                                Thread.currentThread().interrupt()
-                            }
-                        }
-                        locationListenerRunnableMap.remove(listener)
-                        locationListenerThreadMap.remove(listener)
-                        XposedBridge.log("[${packageName}] - locationListener thread stopped: ${threadid}")
-
-                    } else {
-                        XposedBridge.log("[${packageName}] - Error finding locationListener thread or runnable")
-                    }
-
                 }
-            }
+                //----------------end of intent--------------------------------------------------------------
 
-            method {
-                name = "unregisterGnssStatusCallback"
-                param(
-                    android.location.GnssStatus.Callback::class.java
-                )
-            }.hook {
-                after {
-                    val callback = args[0] as android.location.GnssStatus.Callback
-                    if(gnssStatusListenerThreadMap.containsKey(callback) && gnssStatusListenerRunnableMap.containsKey(callback)) {
-                        val threadid = gnssStatusListenerThreadMap[callback]?.getId()
-                        gnssStatusListenerRunnableMap[callback]?.stopThread()
-                        gnssStatusListenerThreadMap[callback]?.let { thread ->
-                            try {
-                                // Wait for the thread to finish with a timeout
-                                thread.join(2000)
-                            } catch (e: InterruptedException) {
-                                Thread.currentThread().interrupt()
+                method {
+                    name = "removeUpdates"
+                    param(
+                        LocationListener::class.java
+                    )
+                }.hook {
+                    after {
+                        val listener = args[0] as LocationListener
+                        if (locationListenerThreadMap.containsKey(listener) && locationListenerRunnableMap.containsKey(
+                                listener
+                            )
+                        ) {
+                            val threadid = locationListenerThreadMap[listener]?.getId()
+                            locationListenerRunnableMap[listener]?.stopThread()
+                            locationListenerThreadMap[listener]?.let { thread ->
+                                try {
+                                    // Wait for the thread to finish with a timeout
+                                    thread.join(2000)
+                                } catch (e: InterruptedException) {
+                                    Thread.currentThread().interrupt()
+                                }
                             }
+                            locationListenerRunnableMap.remove(listener)
+                            locationListenerThreadMap.remove(listener)
+                            XposedBridge.log("[${packageName}] - locationListener thread stopped: ${threadid}")
+
+                        } else {
+                            XposedBridge.log("[${packageName}] - Error finding locationListener thread or runnable")
                         }
-                        gnssStatusListenerRunnableMap.remove(callback)
-                        gnssStatusListenerThreadMap.remove(callback)
-                        XposedBridge.log("[${packageName}] - gnssStatusListener thread stopped: ${threadid}")
 
-                    } else {
-                        XposedBridge.log("[${packageName}] - Error finding gnssStatusListener thread or runnable")
                     }
-
                 }
-            }
 
-            method {
-                name = "getLastKnownLocation"
-                param(String::class.java)
-                returnType = android.location.Location::class.java
-            }.hook {
-                before {
-                    if (System.currentTimeMillis() - mLastUpdated > 200) {
-                        updateLocation()
+                method {
+                    name = "unregisterGnssStatusCallback"
+                    param(
+                        android.location.GnssStatus.Callback::class.java
+                    )
+                }.hook {
+                    after {
+                        val callback = args[0] as android.location.GnssStatus.Callback
+                        if (gnssStatusListenerThreadMap.containsKey(callback) && gnssStatusListenerRunnableMap.containsKey(
+                                callback
+                            )
+                        ) {
+                            val threadid = gnssStatusListenerThreadMap[callback]?.getId()
+                            gnssStatusListenerRunnableMap[callback]?.stopThread()
+                            gnssStatusListenerThreadMap[callback]?.let { thread ->
+                                try {
+                                    // Wait for the thread to finish with a timeout
+                                    thread.join(2000)
+                                } catch (e: InterruptedException) {
+                                    Thread.currentThread().interrupt()
+                                }
+                            }
+                            gnssStatusListenerRunnableMap.remove(callback)
+                            gnssStatusListenerThreadMap.remove(callback)
+                            XposedBridge.log("[${packageName}] - gnssStatusListener thread stopped: ${threadid}")
+
+                        } else {
+                            XposedBridge.log("[${packageName}] - Error finding gnssStatusListener thread or runnable")
+                        }
+
                     }
-                    if (settings.isStarted && !ignorePkg.contains(packageName)) {
-                        val provider = args[0] as String
-                        val location = Location(provider)
-                        location.time = System.currentTimeMillis() - 300
-                        location.latitude = newlat
-                        location.longitude = newlng
-                        location.altitude = 0.0
-                        location.speed = 0F
-                        location.speedAccuracyMetersPerSecond = 0F
-                        XposedBridge.log("[${packageName}] - 'getLastKnowLocation' : lat: ${location.latitude}, lon: ${location.longitude}")
+                }
 
-                        /*
+                method {
+                    name = "getLastKnownLocation"
+                    param(String::class.java)
+                    returnType = android.location.Location::class.java
+                }.hook {
+                    before {
+                        if (System.currentTimeMillis() - mLastUpdated > 200) {
+                            updateLocation()
+                        }
+                        if (settings.isStarted && !ignorePkg.contains(packageName)) {
+                            val provider = args[0] as String
+                            val location = Location(provider)
+                            location.time = System.currentTimeMillis() - 300
+                            location.latitude = newlat
+                            location.longitude = newlng
+                            location.altitude = 0.0
+                            location.speed = 0F
+                            location.speedAccuracyMetersPerSecond = 0F
+                            XposedBridge.log("[${packageName}] - 'getLastKnowLocation' : lat: ${location.latitude}, lon: ${location.longitude}")
+
+                            /*
                         try {
                             HiddenApiBypass.invoke(location.javaClass, location, "isMock", false)
                             HiddenApiBypass.invoke(location.javaClass, location, "isFromMockProvider", false)
@@ -1532,13 +1568,14 @@ object LocationHook : YukiBaseHooker() {
                         }
                         */
 
-                        replaceTo(location)
-                        result = location
+                            replaceTo(location)
+                            result = location
+                        }
                     }
                 }
             }
-        }
 
-    }
+        } // loadApp(isExcludeSelf = true)
+    } // override fun onHook()
 
 }

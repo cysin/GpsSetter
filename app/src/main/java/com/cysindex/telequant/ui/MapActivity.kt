@@ -15,6 +15,7 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.inputmethod.EditorInfo
@@ -69,6 +70,7 @@ import android.view.MotionEvent
 @AndroidEntryPoint
 class MapActivity :  MonetCompatActivity() {
 
+    private val TAG = "TeleQuantMap"
     private val binding by lazy { ActivityMapBinding.inflate(layoutInflater) }
     private lateinit var map: MapView
     private val viewModel by viewModels<MainViewModel>()
@@ -301,6 +303,10 @@ class MapActivity :  MonetCompatActivity() {
         map.setUseDataConnection(true)  // Enable downloading tiles
         map.setMaxZoomLevel(22.0)  // Most zoomed out
         map.setMinZoomLevel(1.0) // Most zoomed in
+
+        // Initialize lat and lon here with values from ViewModel
+        lat = viewModel.getLat
+        lon = viewModel.getLng
         
         // Set up the map
         val mapController = map.controller
@@ -374,7 +380,7 @@ class MapActivity :  MonetCompatActivity() {
             mGeoPoint = GeoPoint(lat, lon)
             mGeoPoint?.let { geoPoint ->
                 map.controller.animateTo(geoPoint)
-                map.controller.setZoom(12.0)
+                map.controller.setZoom(16.0)
                 mMarker?.position = geoPoint
                 mMarker?.title = "Lat: ${geoPoint.latitude}, Lon: ${geoPoint.longitude}"
                 if (!map.overlays.contains(mMarker)) {
@@ -541,7 +547,75 @@ class MapActivity :  MonetCompatActivity() {
         }
     }
 
+    private suspend fun getSearchAddress(address: String) = callbackFlow {
+        withContext(Dispatchers.IO) {
+            trySend(SearchProgress.Progress)
 
+            // First check if input is coordinates
+            val matcher: Matcher = Pattern.compile("[-+]?\\d{1,3}([.]\\d+)?, *[-+]?\\d{1,3}([.]\\d+)?").matcher(address)
+
+            if (matcher.matches()) {
+                delay(3000)
+                trySend(SearchProgress.Complete(
+                    matcher.group().split(",")[0].toDouble(),
+                    matcher.group().split(",")[1].toDouble()
+                ))
+            } else {
+                try {
+                    if (!isNetworkConnected()) {
+                        trySend(SearchProgress.Fail(getString(R.string.no_internet)))
+                        return@withContext
+                    }
+
+                    val geocoder = Geocoder(this@MapActivity)
+
+                    try {
+                        val addressList = geocoder.getFromLocationName(address, 3)
+
+                        when {
+                            addressList == null -> {
+                                trySend(SearchProgress.Fail("Error finding location. Please try again."))
+                            }
+                            addressList.isEmpty() -> {
+                                trySend(SearchProgress.Fail("Please enter a valid address"))
+                            }
+                            addressList.size == 1 -> {
+                                trySend(SearchProgress.Complete(
+                                    addressList[0].latitude,
+                                    addressList[0].longitude
+                                ))
+                            }
+                            else -> {
+                                // Multiple results found
+                                trySend(SearchProgress.Complete(
+                                    addressList[0].latitude,
+                                    addressList[0].longitude
+                                ))
+                            }
+                        }
+                    } catch (e: IOException) {
+                        Log.e(TAG, "Geocoding error", e)
+                        trySend(SearchProgress.Fail("Error finding location. Please try again."))
+                    } catch (e: IllegalArgumentException) {
+                        Log.e(TAG, "Invalid address input", e)
+                        trySend(SearchProgress.Fail("Please enter a valid address"))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Unknown error during geocoding", e)
+                        trySend(SearchProgress.Fail("An unknown error occurred"))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in getSearchAddress", e)
+                    trySend(SearchProgress.Fail("An unknown error occurred"))
+                }
+            }
+        }
+
+        awaitClose {
+            this.cancel()
+        }
+    }
+
+    /*
     private suspend fun getSearchAddress(address: String) = callbackFlow {
         withContext(Dispatchers.IO){
             trySend(SearchProgress.Progress)
@@ -570,7 +644,7 @@ class MapActivity :  MonetCompatActivity() {
         }
 
         awaitClose { this.cancel() }
-    }
+    }*/
 
 
 
@@ -596,10 +670,12 @@ class MapActivity :  MonetCompatActivity() {
     // Get current location
     @SuppressLint("MissingPermission")
     private fun getLastLocation() {
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        //fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         if (checkPermissions()) {
             if (isLocationEnabled()) {
-                fusedLocationClient.lastLocation.addOnCompleteListener(this) { task ->
+                requestNewLocationData()
+
+                /*fusedLocationClient.lastLocation.addOnCompleteListener(this) { task ->
                     val location: Location? = task.result
                     if (location == null) {
                         requestNewLocationData()
@@ -608,7 +684,7 @@ class MapActivity :  MonetCompatActivity() {
                         lon = location.longitude
                         moveMapToNewLocation(true)
                     }
-                }
+                }*/
             } else {
                 showToast("Turn on location")
                 val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
@@ -620,6 +696,7 @@ class MapActivity :  MonetCompatActivity() {
     }
 
 
+    /*
     @SuppressLint("MissingPermission")
     private fun requestNewLocationData() {
         val mLocationRequest = LocationRequest()
@@ -633,6 +710,50 @@ class MapActivity :  MonetCompatActivity() {
             mLocationRequest, mLocationCallback,
             Looper.myLooper()
         )
+    }*/
+
+    @SuppressLint("MissingPermission")
+    private fun requestNewLocationData() {
+        // Check permissions first
+        if (!checkPermissions()) {
+            requestPermissions()
+            return
+        }
+
+        // Using the new LocationRequest.Builder API
+        val locationRequest = LocationRequest.Builder(
+            Priority.PRIORITY_BALANCED_POWER_ACCURACY,  // Use network provider
+            5000 // Default interval in milliseconds
+        ).apply {
+            setMinUpdateIntervalMillis(3000)  // Minimum interval between updates
+            setMaxUpdates(1)  // Get only one location update
+            setWaitForAccurateLocation(false)  // Don't wait for high accuracy
+        }.build()
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        val locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                locationResult.lastLocation?.let { location ->
+                    lat = location.latitude
+                    lon = location.longitude
+                    moveMapToNewLocation(true)
+
+                    // Remove updates after getting location
+                    fusedLocationClient.removeLocationUpdates(this)
+                }
+            }
+        }
+
+        try {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        } catch (securityException: SecurityException) {
+            Log.e(TAG, "Lost location permission. Could not request updates.", securityException)
+        }
     }
 
     private val mLocationCallback = object : LocationCallback() {
@@ -640,6 +761,7 @@ class MapActivity :  MonetCompatActivity() {
             val mLastLocation: Location = locationResult.lastLocation!!
             lat = mLastLocation.latitude
             lon = mLastLocation.longitude
+            moveMapToNewLocation(true)
         }
     }
 
