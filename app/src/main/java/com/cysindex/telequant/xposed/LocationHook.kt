@@ -65,8 +65,10 @@ import kotlin.math.roundToInt
 object LocationHook : YukiBaseHooker() {
 
 
+    // Longitude had lost its sign here (New York is -74.0060), so before the
+    // first settings read every hook reported a point in western China.
     var newlat: Double = 40.7128
-    var newlng: Double = 74.0060
+    var newlng: Double = -74.0060
     private const val pi = 3.14159265359
     private var accuracy : Float = 0.0f
     //private val rand: Random = Random()
@@ -337,35 +339,6 @@ object LocationHook : YukiBaseHooker() {
     }
 
 
-    private fun createGnssStatusCallback( callback: android.location.GnssStatus.Callback) {
-        if (settings.isStarted && !ignorePkg.contains(packageName)) {
-            val callbackClass = callback::class.java
-
-            if(callbackClass.hasMethod {
-                    name = "onSatelliteStatusChanged"
-                }) {
-                callbackClass.method {
-                    name = "onSatelliteStatusChanged"
-                }.hook {
-                    before {
-                        args[0] = mygnssstatus
-                        //XposedBridge.log("[${packageName}] - 'onSatelliteStatusChanged' : mygnssstatus")
-                    }
-                }
-            }
-
-            Thread {
-                callback.onStarted()
-                callback.onFirstFix(1000)
-                for (i in 1..12) {
-                    callback.onSatelliteStatusChanged(mygnssstatus)
-                    Thread.sleep(800)
-                }
-            }.start()
-
-        }
-    }
-
     private fun updateLocation() {
         try {
             mLastUpdated = System.currentTimeMillis()
@@ -394,31 +367,36 @@ object LocationHook : YukiBaseHooker() {
     @SuppressLint("NewApi")
     override fun onHook() {
         loadApp(isExcludeSelf = true) {
+            // Nested classes need their binary name ("Settings$Secure"); with a dot
+            // the lookup always failed and the whole block was skipped. The arity
+            // was wrong too -- getStringForUser is (ContentResolver, String, int).
             val settingsClasses = arrayOf(
-                "android.provider.Settings.Secure",
-                "android.provider.Settings.System",
-                "android.provider.Settings.Global",
-                "android.provider.Settings.NameValueCache"
+                "android.provider.Settings\$Secure",
+                "android.provider.Settings\$System",
+                "android.provider.Settings\$Global",
+                "android.provider.Settings\$NameValueCache"
             )
 
+            // Historic mock-location switch. Removed as a real setting in API 23+,
+            // but apps still probe it, and reporting "0" costs nothing.
+            val mockKeys = setOf("mock_location", "allow_mock_location")
 
             settingsClasses.forEach { className ->
                 if (!className.hasClass()) return@forEach
 
-                className.toClass().method {
-                    name = "getStringForUser"
-                    paramCount = 2  // Assuming method has 2 parameters
-                }.hookAll {
-                    replaceUnit {
-                        val name = args[1] as? String
-                        result = when (name) {
-                            "mock_location" -> "0"
-                            else -> try {
-                                callOriginal()
-                            } catch (e: Exception) {
-                                YLog.warn("${className}: hook error $e")
-                                //throwable(e)
-                                //null
+                val settingsClass = className.toClass()
+
+                // Hook every arity rather than guessing: the signature differs
+                // across API levels and OEM forks.
+                arrayOf("getStringForUser", "getString").forEach { methodName ->
+                    if (!settingsClass.hasMethod { name = methodName }) return@forEach
+
+                    settingsClass.method { name = methodName }.hookAll {
+                        before {
+                            // The key is the String argument, wherever it sits.
+                            val key = args.firstOrNull { it is String } as? String
+                            if (key in mockKeys) {
+                                result = "0"
                             }
                         }
                     }
@@ -1367,7 +1345,10 @@ object LocationHook : YukiBaseHooker() {
                     )
                 }.hook {
                     after {
-                        val listener = args[3] as android.location.LocationListener
+                        // args[3] is the Executor in this overload; the listener is
+                        // args[4]. Reading index 3 threw ClassCastException every
+                        // time, so this overload has never worked.
+                        val listener = args[4] as android.location.LocationListener
                         val providername = LocationManager.GPS_PROVIDER
                         if (!locationListenerThreadMap.containsKey(listener) || !locationListenerRunnableMap.containsKey(
                                 listener
@@ -1396,8 +1377,11 @@ object LocationHook : YukiBaseHooker() {
                         android.app.PendingIntent::class.java,
                     )
                 }.hook {
-                    replaceUnit { }
-                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    // The log used to sit here, in the hook *builder*, so it fired
+                    // once at install time instead of once per call.
+                    replaceUnit {
+                        XposedBridge.log("[${packageName}] - suppressed PendingIntent requestLocationUpdates")
+                    }
                     /*
                 after {
                     val listener = args[3] as android.location.LocationListener
@@ -1425,8 +1409,11 @@ object LocationHook : YukiBaseHooker() {
                         android.app.PendingIntent::class.java,
                     )
                 }.hook {
-                    replaceUnit { }
-                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    // The log used to sit here, in the hook *builder*, so it fired
+                    // once at install time instead of once per call.
+                    replaceUnit {
+                        XposedBridge.log("[${packageName}] - suppressed PendingIntent requestLocationUpdates")
+                    }
                     /*after {
                     val pintent = args[3] as android.app.PendingIntent
                     val providername = LocationManager.GPS_PROVIDER
@@ -1452,8 +1439,11 @@ object LocationHook : YukiBaseHooker() {
                         android.app.PendingIntent::class.java,
                     )
                 }.hook {
-                    replaceUnit { }
-                    XposedBridge.log("[${packageName}] - relaced requestLocationUpdates with intent")
+                    // The log used to sit here, in the hook *builder*, so it fired
+                    // once at install time instead of once per call.
+                    replaceUnit {
+                        XposedBridge.log("[${packageName}] - suppressed PendingIntent requestLocationUpdates")
+                    }
                     /*
                 after {
                     val listener = args[3] as android.location.LocationListener
