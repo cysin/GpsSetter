@@ -11,6 +11,22 @@
     <!-- Required since Android 13 to post the "location set" notification. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+        Recording the radio environment. Each one gates a different signal; a
+        refusal degrades that signal only, and the recorder reports which.
+    -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!--
+        Deliberately without usesPermissionFlags="neverForLocation": this scan
+        is used to characterise a place, and asserting otherwise would both be
+        untrue and let the system filter the results we need.
+    -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
 
 
     <application

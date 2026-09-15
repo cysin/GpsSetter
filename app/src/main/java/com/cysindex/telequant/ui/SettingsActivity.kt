@@ -41,16 +41,24 @@ class SettingsActivity : AppCompatActivity() {
     class SettingPreferenceDataStore() : PreferenceDataStore() {
         override fun getBoolean(key: String?, defValue: Boolean): Boolean {
             return when (key) {
-                "random_position" -> PrefManager.isRandomPosition
                 "isJoyStickEnable" -> PrefManager.isJoyStickEnable
+                "gcj02_output" -> PrefManager.gcj02Output
+                "spoof_cell" -> PrefManager.spoofCell
+                "spoof_wifi" -> PrefManager.spoofWifi
+                "spoof_bluetooth" -> PrefManager.spoofBluetooth
+                "spoof_timezone" -> PrefManager.spoofTimeZone
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
 
         override fun putBoolean(key: String?, value: Boolean) {
             return when (key) {
-                "random_position" -> PrefManager.isRandomPosition = value
                 "isJoyStickEnable" -> PrefManager.isJoyStickEnable = value
+                "gcj02_output" -> PrefManager.gcj02Output = value
+                "spoof_cell" -> PrefManager.spoofCell = value
+                "spoof_wifi" -> PrefManager.spoofWifi = value
+                "spoof_bluetooth" -> PrefManager.spoofBluetooth = value
+                "spoof_timezone" -> PrefManager.spoofTimeZone = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -59,6 +67,8 @@ class SettingsActivity : AppCompatActivity() {
             return when (key) {
                 "accuracy_settings" -> PrefManager.accuracy
                 "darkTheme" -> PrefManager.darkTheme.toString()
+                "jitter_radius" -> PrefManager.jitterRadius
+                "jitter_mode" -> PrefManager.jitterMode
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -67,6 +77,8 @@ class SettingsActivity : AppCompatActivity() {
             return when (key) {
                 "accuracy_settings" -> PrefManager.accuracy = value
                 "darkTheme" -> PrefManager.darkTheme = value!!.toInt()
+                "jitter_radius" -> PrefManager.jitterRadius = value
+                "jitter_mode" -> PrefManager.jitterMode = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }

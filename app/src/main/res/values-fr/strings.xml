@@ -49,11 +49,6 @@
     <string name="enter_valid_input">Entrer un numéro valide</string>
     <string name="delete_favourite_item">Supprimer favoris</string>
     <string name="title_activity_settings">Réglges</string>
-    <string name="random_position">Position aléatoire</string>
-    <string name="random_position_summary">La position de l\'emplacement sera aléatoire autour de l\'emplacement défini</string>
-
-
-
     <!--Dialog-->
 
     <string name="progress_dialog_searching">Recherche…</string>
@@ -67,4 +62,28 @@
     <string name="stop">Arrêter</string>
     <string name="start_spoofing">Définir la position</string>
     <string name="current_address">adresse actuelle</string>
+    <string name="jitter_radius">Rayon de variation</string>
+    <string name="jitter_radius_summary">Mètres sur lesquels la position signalée peut varier. 0 la fixe exactement.</string>
+    <string name="jitter_mode">Type de déplacement</string>
+    <string name="signals">Signaux</string>
+    <string name="spoof_cell">Antennes-relais</string>
+    <string name="spoof_cell_summary">Signaler les antennes enregistrées au lieu des réelles</string>
+    <string name="spoof_wifi">Wi-Fi</string>
+    <string name="spoof_wifi_summary">Signaler les points d\'accès enregistrés au lieu des réels</string>
+    <string name="spoof_bluetooth">Bluetooth</string>
+    <string name="spoof_bluetooth_summary">Signaler les balises enregistrées au lieu des réelles</string>
+    <string name="gcj02">Sortie GCJ-02</string>
+    <string name="gcj02_summary">Émettre le système de coordonnées décalé utilisé en Chine continentale. Sans effet ailleurs.</string>
+    <string name="spoof_timezone">Fuseau horaire</string>
+    <string name="spoof_timezone_summary">Signaler aussi le fuseau du lieu simulé. Affecte toutes les dates formatées par l\'application.</string>
+    <string name="record_environment">Enregistrer ce lieu</string>
+    <string name="recording_title">Enregistrement</string>
+    <string name="recording_message">Capture du GPS, des antennes-relais, du Wi-Fi et du Bluetooth. Environ 15 secondes.</string>
+    <string name="recording_done">Enregistrement terminé</string>
+    <string name="recording_summary">%1$d antennes-relais, %2$d points d\'accès et %3$d balises capturés.</string>
+    <string name="recording_missing">Non capturé :</string>
+    <string name="recording_use">Utiliser ce lieu</string>
+    <string name="recording_discard">Ignorer</string>
+    <string name="recording_applied">Lieu appliqué</string>
+    <string name="recording_failed">Échec de l\'enregistrement</string>
 </resources>

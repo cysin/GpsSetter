@@ -10,6 +10,7 @@ import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
 import android.location.Geocoder
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
@@ -38,6 +39,7 @@ import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.R
 import com.cysindex.telequant.adapter.FavListAdapter
 import com.cysindex.telequant.databinding.ActivityMapBinding
+import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
 import com.cysindex.telequant.utils.JoystickService
 import com.cysindex.telequant.utils.NotificationsChannel
@@ -88,6 +90,17 @@ class MapActivity : AppCompatActivity() {
      */
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /**
+     * Recording asks for several permissions at once. A refusal is not fatal:
+     * the recorder degrades that one signal and reports it, so the result
+     * dialog can say exactly what is missing rather than silently storing a
+     * half-empty environment.
+     */
+    private val requestRecordingPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            startRecording()
+        }
 
     private val headerBackground by lazy {
         elevationOverlayProvider.compositeOverlayWithThemeSurfaceColorIfNeeded(
@@ -242,7 +255,9 @@ class MapActivity : AppCompatActivity() {
             // AGP 9 compiles apps against non-final R fields, so resource ids can no
             // longer appear in `when`/switch branches.
             val id = it.itemId
-            if (id == R.id.get_favourite) {
+            if (id == R.id.record_environment) {
+                recordEnvironment()
+            } else if (id == R.id.get_favourite) {
                 openFavouriteListDialog()
             } else if (id == R.id.settings) {
                 startActivity(Intent(this, SettingsActivity::class.java))
@@ -534,6 +549,73 @@ class MapActivity : AppCompatActivity() {
         ) {
             getLastLocation()
         }
+    }
+
+    /** Permissions the recorder wants, filtered to those not already held. */
+    private fun missingRecordingPermissions(): Array<String> = buildList {
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        add(Manifest.permission.READ_PHONE_STATE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+    }.filter {
+        ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+    }.toTypedArray()
+
+    private fun recordEnvironment() {
+        val missing = missingRecordingPermissions()
+        if (missing.isNotEmpty()) {
+            requestRecordingPermissions.launch(missing)
+        } else {
+            startRecording()
+        }
+    }
+
+    private fun startRecording() {
+        val progress = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.recording_title)
+            .setMessage(R.string.recording_message)
+            .setCancelable(false)
+            .show()
+
+        lifecycleScope.launch {
+            val result = runCatching { EnvironmentRecorder(this@MapActivity).record() }
+            progress.dismiss()
+            result.onSuccess { showRecordingResult(it) }
+                .onFailure { showToast(getString(R.string.recording_failed)) }
+        }
+    }
+
+    private fun showRecordingResult(result: EnvironmentRecorder.Result) {
+        val env = result.environment
+        val summary = buildString {
+            append(getString(R.string.recording_summary, env.cells.size, env.wifis.size, env.beacons.size))
+            if (result.missing.isNotEmpty()) {
+                append("\n\n")
+                append(getString(R.string.recording_missing))
+                result.missing.forEach { append("\n  • ").append(it) }
+            }
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.recording_done)
+            .setMessage(summary)
+            .setPositiveButton(R.string.recording_use) { _, _ ->
+                PrefManager.activeEnvironment = env.toJson().toString()
+                if (env.lat != 0.0 || env.lng != 0.0) {
+                    lat = env.lat
+                    lon = env.lng
+                    moveMapToNewLocation(true)
+                }
+                showToast(getString(R.string.recording_applied))
+            }
+            .setNegativeButton(R.string.recording_discard, null)
+            .show()
     }
 
     private fun showMarker() {

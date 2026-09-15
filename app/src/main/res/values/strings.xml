@@ -58,13 +58,38 @@
     <string name="enter_valid_input">Enter valid number</string>
     <string name="delete_favourite_item">Delete favourite</string>
     <string name="title_activity_settings">Settings</string>
-    <string name="random_position">Random position</string>
-    <string name="random_position_summary">Location position will be random around set location</string>
+    <string name="jitter_radius">Jitter radius</string>
+    <string name="jitter_radius_summary">Metres the reported position may wander from the anchor. 0 pins it exactly.</string>
+    <string name="jitter_mode">Movement style</string>
+    <string name="signals">Signals</string>
+    <string name="spoof_cell">Cell towers</string>
+    <string name="spoof_cell_summary">Report the recorded towers instead of the real ones</string>
+    <string name="spoof_wifi">Wi-Fi</string>
+    <string name="spoof_wifi_summary">Report the recorded access points instead of the real ones</string>
+    <string name="spoof_bluetooth">Bluetooth</string>
+    <string name="spoof_bluetooth_summary">Report the recorded beacons instead of the real ones</string>
+    <string name="gcj02">GCJ-02 output</string>
+    <string name="gcj02_summary">Emit the offset coordinate system used in mainland China. No effect outside it.</string>
+    <string name="spoof_timezone">Time zone</string>
+    <string name="spoof_timezone_summary">Also report the time zone of the spoofed place. Affects every date the app formats.</string>
     <string name="drawer_open">open</string>
     <string name="drawer_close">close</string>
     <string name="stop">Stop</string>
     <string name="start_spoofing">Set location</string>
     <string name="current_address">current address</string>
 
+
+
+    <!-- Environment recording -->
+    <string name="record_environment">Record this place</string>
+    <string name="recording_title">Recording</string>
+    <string name="recording_message">Capturing GPS, cell towers, Wi-Fi and Bluetooth. This takes about 15 seconds.</string>
+    <string name="recording_done">Recording finished</string>
+    <string name="recording_summary">Captured %1$d cell towers, %2$d access points and %3$d beacons.</string>
+    <string name="recording_missing">Not captured:</string>
+    <string name="recording_use">Use this place</string>
+    <string name="recording_discard">Discard</string>
+    <string name="recording_applied">Place applied</string>
+    <string name="recording_failed">Recording failed</string>
 
 </resources>

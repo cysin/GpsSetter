@@ -23,4 +23,18 @@
     </string-array>
 
 
+
+    <!-- Jitter movement style; values must match JitterEngine.Mode -->
+    <string-array name="jitter_mode_texts">
+        <item>Stationary</item>
+        <item>Walking</item>
+        <item>Driving</item>
+    </string-array>
+
+    <string-array name="jitter_mode_values" translatable="false">
+        <item>STATIONARY</item>
+        <item>WALKING</item>
+        <item>DRIVING</item>
+    </string-array>
+
 </resources>

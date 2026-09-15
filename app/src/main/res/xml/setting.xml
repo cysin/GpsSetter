@@ -35,12 +35,55 @@
             android:icon="@drawable/ic_accuracy"
             android:summary="10 m."/>
 
-        <rikka.material.preference.MaterialSwitchPreference
-            android:title="@string/random_position"
-            android:summary="@string/random_position_summary"
+        <EditTextPreference
+            android:defaultValue="10"
+            android:digits="0123456789"
+            android:key="jitter_radius"
+            android:title="@string/jitter_radius"
             android:icon="@drawable/ic_random_position"
-            android:key="random_position"/>
+            android:summary="@string/jitter_radius_summary" />
 
+        <rikka.preference.SimpleMenuPreference
+            android:defaultValue="STATIONARY"
+            android:entries="@array/jitter_mode_texts"
+            android:entryValues="@array/jitter_mode_values"
+            android:key="jitter_mode"
+            android:summary="%s"
+            android:title="@string/jitter_mode" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/signals">
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="true"
+            android:key="spoof_cell"
+            android:summary="@string/spoof_cell_summary"
+            android:title="@string/spoof_cell" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="true"
+            android:key="spoof_wifi"
+            android:summary="@string/spoof_wifi_summary"
+            android:title="@string/spoof_wifi" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="true"
+            android:key="spoof_bluetooth"
+            android:summary="@string/spoof_bluetooth_summary"
+            android:title="@string/spoof_bluetooth" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="gcj02_output"
+            android:summary="@string/gcj02_summary"
+            android:title="@string/gcj02" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="spoof_timezone"
+            android:summary="@string/spoof_timezone_summary"
+            android:title="@string/spoof_timezone" />
 
     </PreferenceCategory>
 
