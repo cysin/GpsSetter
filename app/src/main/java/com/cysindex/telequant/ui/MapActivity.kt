@@ -39,6 +39,8 @@ import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.R
 import com.cysindex.telequant.adapter.FavListAdapter
 import com.cysindex.telequant.databinding.ActivityMapBinding
+import com.cysindex.telequant.map.OfflineTileManager
+import com.cysindex.telequant.map.TileSourceConfig
 import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
 import com.cysindex.telequant.utils.JoystickService
@@ -257,6 +259,8 @@ class MapActivity : AppCompatActivity() {
             val id = it.itemId
             if (id == R.id.record_environment) {
                 recordEnvironment()
+            } else if (id == R.id.offline_map) {
+                downloadCurrentArea()
             } else if (id == R.id.get_favourite) {
                 openFavouriteListDialog()
             } else if (id == R.id.settings) {
@@ -270,12 +274,14 @@ class MapActivity : AppCompatActivity() {
     }
 
     private fun initializeMap() {
-        Configuration.getInstance().userAgentValue = packageName
+        // Cache paths, user agent and the tile proxy are set once in App;
+        // re-applying the proxy here picks up a change made in settings.
+        TileSourceConfig.applyProxy()
         map = binding.mapContainer
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
         map.isTilesScaledToDpi = true
-        map.setUseDataConnection(true)
+        map.setUseDataConnection(!PrefManager.offlineMap)
         map.maxZoomLevel = 22.0
         map.minZoomLevel = 1.0
 
@@ -618,6 +624,54 @@ class MapActivity : AppCompatActivity() {
             .show()
     }
 
+    /**
+     * Downloads the tiles for the current viewport. The estimate is shown first
+     * because tile count grows fourfold per zoom level, so a range that looks
+     * modest can run to hundreds of megabytes.
+     */
+    private fun downloadCurrentArea() {
+        val area = map.boundingBox
+        val zoomMin = map.zoomLevelDouble.toInt().coerceAtLeast(1)
+        val zoomMax = (zoomMin + OFFLINE_EXTRA_ZOOM).coerceAtMost(19)
+        val manager = OfflineTileManager(map)
+        val estimate = manager.estimate(area, zoomMin, zoomMax)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.offline_download)
+            .setMessage(
+                getString(
+                    R.string.offline_estimate,
+                    zoomMin, zoomMax, estimate.tileCount, estimate.approxBytes / (1024 * 1024)
+                )
+            )
+            .setPositiveButton(R.string.offline_start) { _, _ ->
+                val progress = MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.offline_downloading)
+                    .setMessage(getString(R.string.offline_progress, 0, estimate.tileCount))
+                    .setCancelable(false)
+                    .show()
+                manager.download(
+                    context = this,
+                    area = area,
+                    zoomMin = zoomMin,
+                    zoomMax = zoomMax,
+                    onProgress = { done, total ->
+                        progress.setMessage(getString(R.string.offline_progress, done, total))
+                    },
+                    onFinished = {
+                        progress.dismiss()
+                        showToast(getString(R.string.offline_done))
+                    },
+                    onFailed = { reason ->
+                        progress.dismiss()
+                        showToast(getString(R.string.offline_failed, reason))
+                    }
+                )
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun showMarker() {
         if (mMarker != null && !map.overlays.contains(mMarker)) {
             map.overlays.add(mMarker)
@@ -634,6 +688,9 @@ class MapActivity : AppCompatActivity() {
 
     private companion object {
         const val PERMISSION_ID = 42
+
+        /** Zoom levels below the current one to also fetch when going offline. */
+        const val OFFLINE_EXTRA_ZOOM = 3
     }
 }
 

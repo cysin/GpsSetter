@@ -30,6 +30,10 @@ object PrefManager   {
     private const val SPOOF_BLUETOOTH = "spoof_bluetooth"
     private const val SPOOF_TIMEZONE = "spoof_timezone"
     private const val ACTIVE_ENVIRONMENT = "active_environment"
+    private const val TILE_PROXY_ENABLED = "tile_proxy_enabled"
+    private const val TILE_PROXY_HOST = "tile_proxy_host"
+    private const val TILE_PROXY_PORT = "tile_proxy_port"
+    private const val OFFLINE_MAP = "offline_map"
 
 
     private val pref: SharedPreferences by lazy {
@@ -109,6 +113,24 @@ object PrefManager   {
     var activeEnvironment: String?
         get() = pref.getString(ACTIVE_ENVIRONMENT, null)
         set(value) { pref.edit().putString(ACTIVE_ENVIRONMENT, value).apply() }
+
+    /** Route tile downloads through a local HTTP (CONNECT) proxy. */
+    var tileProxyEnabled: Boolean
+        get() = pref.getBoolean(TILE_PROXY_ENABLED, true)
+        set(value) = pref.edit().putBoolean(TILE_PROXY_ENABLED, value).apply()
+
+    var tileProxyHost: String?
+        get() = pref.getString(TILE_PROXY_HOST, "127.0.0.1")
+        set(value) { pref.edit().putString(TILE_PROXY_HOST, value).apply() }
+
+    var tileProxyPort: String?
+        get() = pref.getString(TILE_PROXY_PORT, "33009")
+        set(value) { pref.edit().putString(TILE_PROXY_PORT, value).apply() }
+
+    /** Serve tiles from the cache only; nothing is fetched. */
+    var offlineMap: Boolean
+        get() = pref.getBoolean(OFFLINE_MAP, false)
+        set(value) = pref.edit().putBoolean(OFFLINE_MAP, value).apply()
 
 
 

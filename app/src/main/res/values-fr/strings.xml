@@ -86,4 +86,18 @@
     <string name="recording_discard">Ignorer</string>
     <string name="recording_applied">Lieu appliqué</string>
     <string name="recording_failed">Échec de l\'enregistrement</string>
+    <string name="offline_download">Télécharger cette zone</string>
+    <string name="offline_estimate">Zoom %1$d à %2$d : environ %3$d tuiles, soit %4$d Mo.\n\nLe nombre de tuiles quadruple à chaque niveau de zoom.</string>
+    <string name="offline_start">Télécharger</string>
+    <string name="offline_downloading">Téléchargement des tuiles</string>
+    <string name="offline_progress">%1$d sur %2$d tuiles</string>
+    <string name="offline_done">Zone disponible hors ligne</string>
+    <string name="offline_failed">Échec du téléchargement : %1$s</string>
+    <string name="offline_mode">Mode hors ligne</string>
+    <string name="offline_mode_summary">Utiliser uniquement le cache ; aucun téléchargement</string>
+    <string name="tile_proxy">Proxy de tuiles</string>
+    <string name="tile_proxy_summary">Récupérer les tuiles via un proxy HTTP local</string>
+    <string name="tile_proxy_host">Hôte du proxy</string>
+    <string name="tile_proxy_port">Port du proxy</string>
+    <string name="map_category">Carte</string>
 </resources>

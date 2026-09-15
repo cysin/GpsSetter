@@ -92,4 +92,21 @@
     <string name="recording_applied">Place applied</string>
     <string name="recording_failed">Recording failed</string>
 
+
+    <!-- Offline map -->
+    <string name="offline_download">Download this area</string>
+    <string name="offline_estimate">Zoom %1$d to %2$d: about %3$d tiles, roughly %4$d MB.\n\nTile count grows fourfold per zoom level.</string>
+    <string name="offline_start">Download</string>
+    <string name="offline_downloading">Downloading tiles</string>
+    <string name="offline_progress">%1$d of %2$d tiles</string>
+    <string name="offline_done">Area available offline</string>
+    <string name="offline_failed">Download failed: %1$s</string>
+    <string name="offline_mode">Offline mode</string>
+    <string name="offline_mode_summary">Serve tiles from the cache only; nothing is fetched</string>
+    <string name="tile_proxy">Tile proxy</string>
+    <string name="tile_proxy_summary">Fetch map tiles through a local HTTP proxy</string>
+    <string name="tile_proxy_host">Proxy host</string>
+    <string name="tile_proxy_port">Proxy port</string>
+    <string name="map_category">Map</string>
+
 </resources>

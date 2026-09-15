@@ -12,6 +12,12 @@
         android:icon="@drawable/ic_accuracy"/>
 
     <item
+        android:id="@+id/offline_map"
+        android:title="@string/offline_download"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_map_type"/>
+
+    <item
         android:id="@+id/get_favourite"
         android:title="@string/favourites"
         app:showAsAction="always"

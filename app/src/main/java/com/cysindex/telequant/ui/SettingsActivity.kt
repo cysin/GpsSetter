@@ -47,6 +47,8 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth
                 "spoof_timezone" -> PrefManager.spoofTimeZone
+                "tile_proxy_enabled" -> PrefManager.tileProxyEnabled
+                "offline_map" -> PrefManager.offlineMap
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -59,6 +61,8 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi = value
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth = value
                 "spoof_timezone" -> PrefManager.spoofTimeZone = value
+                "tile_proxy_enabled" -> PrefManager.tileProxyEnabled = value
+                "offline_map" -> PrefManager.offlineMap = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -69,6 +73,8 @@ class SettingsActivity : AppCompatActivity() {
                 "darkTheme" -> PrefManager.darkTheme.toString()
                 "jitter_radius" -> PrefManager.jitterRadius
                 "jitter_mode" -> PrefManager.jitterMode
+                "tile_proxy_host" -> PrefManager.tileProxyHost
+                "tile_proxy_port" -> PrefManager.tileProxyPort
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -79,6 +85,8 @@ class SettingsActivity : AppCompatActivity() {
                 "darkTheme" -> PrefManager.darkTheme = value!!.toInt()
                 "jitter_radius" -> PrefManager.jitterRadius = value
                 "jitter_mode" -> PrefManager.jitterMode = value
+                "tile_proxy_host" -> PrefManager.tileProxyHost = value
+                "tile_proxy_port" -> PrefManager.tileProxyPort = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
