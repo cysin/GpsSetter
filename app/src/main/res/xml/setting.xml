@@ -13,24 +13,6 @@
             android:summary="%s"
             android:title="@string/dark_theme" />
 
-        <rikka.preference.SimpleMenuPreference
-            android:title="Map"
-            android:summary="%s"
-            android:icon="@drawable/ic_map_type"
-            android:key="map_type"
-            android:dialogTitle="Map type"
-            android:entries="@array/map_type"
-            android:entryValues="@array/map_value"
-            android:defaultValue="1"/>
-
-        <rikka.material.preference.MaterialSwitchPreference
-            android:title="@string/check_update"
-            android:summary="@string/check_update_summary"
-            android:icon="@drawable/ic_update"
-            android:key="disable_update"
-            android:defaultValue="false"/>
-
-
         <Preference
             android:title="Add Joystick"
             android:key="isJoyStickEnable"
@@ -44,12 +26,6 @@
 
 
     <PreferenceCategory app:title="@string/xposed">
-
-        <CheckBoxPreference
-            android:title="@string/advance_hook"
-            android:summary="@string/advanced_summary"
-            android:key="isHookedSystem"
-            android:icon="@drawable/ic_advance_hook"/>
 
         <EditTextPreference
             android:defaultValue="10"

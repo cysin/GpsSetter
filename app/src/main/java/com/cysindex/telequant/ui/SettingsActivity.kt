@@ -25,12 +25,12 @@ import com.cysindex.telequant.databinding.SettingsActivityBinding
 import com.cysindex.telequant.utils.JoystickService
 import com.cysindex.telequant.utils.PrefManager
 import com.cysindex.telequant.utils.ext.showToast
+import androidx.appcompat.app.AppCompatActivity
 import com.highcapable.yukihookapi.hook.xposed.prefs.ui.ModulePreferenceFragment
-import com.kieronquinn.monetcompat.app.MonetCompatActivity
 import rikka.preference.SimpleMenuPreference
 
 
-class SettingsActivity : MonetCompatActivity() {
+class SettingsActivity : AppCompatActivity() {
 
 
 
@@ -41,9 +41,7 @@ class SettingsActivity : MonetCompatActivity() {
     class SettingPreferenceDataStore() : PreferenceDataStore() {
         override fun getBoolean(key: String?, defValue: Boolean): Boolean {
             return when (key) {
-                "isHookedSystem" -> PrefManager.isHookSystem
                 "random_position" -> PrefManager.isRandomPosition
-                "disable_update" -> PrefManager.disableUpdate
                 "isJoyStickEnable" -> PrefManager.isJoyStickEnable
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
@@ -51,9 +49,7 @@ class SettingsActivity : MonetCompatActivity() {
 
         override fun putBoolean(key: String?, value: Boolean) {
             return when (key) {
-                "isHookedSystem" -> PrefManager.isHookSystem = value
                 "random_position" -> PrefManager.isRandomPosition = value
-                "disable_update" -> PrefManager.disableUpdate = value
                 "isJoyStickEnable" -> PrefManager.isJoyStickEnable = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
@@ -62,7 +58,6 @@ class SettingsActivity : MonetCompatActivity() {
         override fun getString(key: String?, defValue: String?): String? {
             return when (key) {
                 "accuracy_settings" -> PrefManager.accuracy
-                "map_type" -> PrefManager.mapType.toString()
                 "darkTheme" -> PrefManager.darkTheme.toString()
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
@@ -71,7 +66,6 @@ class SettingsActivity : MonetCompatActivity() {
         override fun putString(key: String?, value: String?) {
             return when (key) {
                 "accuracy_settings" -> PrefManager.accuracy = value
-                "map_type" -> PrefManager.mapType = value!!.toInt()
                 "darkTheme" -> PrefManager.darkTheme = value!!.toInt()
                 else -> throw IllegalArgumentException("Invalid key $key")
             }

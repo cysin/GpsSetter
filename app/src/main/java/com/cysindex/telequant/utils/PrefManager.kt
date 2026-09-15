@@ -18,12 +18,9 @@ object PrefManager   {
     private const val START = "start"
     private const val LATITUDE = "latitude"
     private const val LONGITUDE = "longitude"
-    private const val HOOKED_SYSTEM = "isHookedSystem"
     private const val RANDOM_POSITION = "random_position"
     private const val ACCURACY_SETTING = "accuracy_settings"
-    private const val MAP_TYPE = "map_type"
     private const val DARK_THEME = "dark_theme"
-    private const val DISABLE_UPDATE = "disable_update"
 
 
     private val pref: SharedPreferences by lazy {
@@ -53,10 +50,6 @@ object PrefManager   {
     val getLng : Double
         get() = pref.getFloat(LONGITUDE, -74.0060F).toDouble()
 
-    var isHookSystem : Boolean
-        get() = pref.getBoolean(HOOKED_SYSTEM, false)
-        set(value) { pref.edit().putBoolean(HOOKED_SYSTEM,value).apply() }
-
     var isRandomPosition :Boolean
         get() = pref.getBoolean(RANDOM_POSITION, false)
         set(value) { pref.edit().putBoolean(RANDOM_POSITION, value).apply() }
@@ -65,17 +58,9 @@ object PrefManager   {
         get() = pref.getString(ACCURACY_SETTING,"10")
         set(value) { pref.edit().putString(ACCURACY_SETTING,value).apply()}
 
-    var mapType : Int
-        get() = pref.getInt(MAP_TYPE,1)
-        set(value) { pref.edit().putInt(MAP_TYPE,value).apply()}
-
     var darkTheme: Int
         get() = pref.getInt(DARK_THEME, DayNightDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         set(value) = pref.edit().putInt(DARK_THEME, value).apply()
-
-    var disableUpdate: Boolean
-        get() = pref.getBoolean(DISABLE_UPDATE, false)
-        set(value) = pref.edit().putBoolean(DISABLE_UPDATE, value).apply()
 
     var isJoyStickEnable: Boolean
     get() = pref.getBoolean("isJoyStickEnable",false)
