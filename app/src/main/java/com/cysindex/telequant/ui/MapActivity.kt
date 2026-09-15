@@ -19,6 +19,7 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
@@ -81,6 +82,13 @@ class MapActivity : AppCompatActivity() {
 
     private val elevationOverlayProvider by lazy { ElevationOverlayProvider(this) }
 
+    /**
+     * POST_NOTIFICATIONS is a runtime permission since Android 13; without it the
+     * "location set" notification is dropped silently.
+     */
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     private val headerBackground by lazy {
         elevationOverlayProvider.compositeOverlayWithThemeSurfaceColorIfNeeded(
             resources.getDimension(R.dimen.bottom_sheet_elevation)
@@ -118,6 +126,9 @@ class MapActivity : AppCompatActivity() {
         }
 
         binding.bottomSheetContainer.startSpoofing.setOnClickListener {
+            if (!notificationsChannel.hasPermission(this)) {
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
             viewModel.update(true, lat, lon)
             mGeoPoint?.let { mMarker?.position = it }
             showMarker()

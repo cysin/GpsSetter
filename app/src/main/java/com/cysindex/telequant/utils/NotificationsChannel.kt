@@ -1,11 +1,14 @@
 package com.cysindex.telequant.utils
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.cysindex.telequant.R
  class NotificationsChannel{
 
@@ -23,10 +26,20 @@ import com.cysindex.telequant.R
         return NotificationCompat.Builder(context, "set.location").apply { options(this) }.build()
     }
 
-    fun showNotification(context: Context, options: (NotificationCompat.Builder) -> Unit): Notification {
+    fun hasPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Returns null when POST_NOTIFICATIONS has not been granted. Android 13+
+     * silently drops the notification in that case, so the caller gets to know
+     * rather than assuming it was shown.
+     */
+    fun showNotification(context: Context, options: (NotificationCompat.Builder) -> Unit): Notification? {
+        if (!hasPermission(context)) return null
         val notification = createNotification(context, options)
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(123, notification)
+        notificationManager.notify(NOTIFICATION_ID, notification)
         return notification
     }
 
@@ -35,5 +48,7 @@ import com.cysindex.telequant.R
         notificationManager.cancelAll()
     }
 
-
+    private companion object {
+        const val NOTIFICATION_ID = 123
+    }
 }
