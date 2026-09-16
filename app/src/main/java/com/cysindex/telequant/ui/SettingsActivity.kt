@@ -76,6 +76,7 @@ class SettingsActivity : AppCompatActivity() {
                 "tile_proxy_host" -> PrefManager.tileProxyHost
                 "tile_proxy_port" -> PrefManager.tileProxyPort
                 "joystick_speed" -> PrefManager.joystickSpeed
+                "map_style" -> PrefManager.mapStyle
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -89,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
                 "tile_proxy_host" -> PrefManager.tileProxyHost = value
                 "tile_proxy_port" -> PrefManager.tileProxyPort = value
                 "joystick_speed" -> PrefManager.joystickSpeed = value
+                "map_style" -> PrefManager.mapStyle = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }

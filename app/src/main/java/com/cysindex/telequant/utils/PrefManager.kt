@@ -38,6 +38,7 @@ object PrefManager   {
     private const val TILE_PROXY_PORT = "tile_proxy_port"
     private const val OFFLINE_MAP = "offline_map"
     private const val JOYSTICK_SPEED = "joystick_speed"
+    private const val MAP_STYLE = "map_style"
 
 
     private val pref: SharedPreferences by lazy {
@@ -155,6 +156,11 @@ object PrefManager   {
     var joystickSpeed: String?
         get() = pref.getString(JOYSTICK_SPEED, "8")
         set(value) { pref.edit().putString(JOYSTICK_SPEED, value).apply() }
+
+    /** OpenFreeMap style name: liberty, bright or positron. */
+    var mapStyle: String?
+        get() = pref.getString(MAP_STYLE, "liberty")
+        set(value) { pref.edit().putString(MAP_STYLE, value).apply() }
 
     /** Serve tiles from the cache only; nothing is fetched. */
     var offlineMap: Boolean

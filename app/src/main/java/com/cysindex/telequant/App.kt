@@ -1,7 +1,7 @@
 package com.cysindex.telequant
 
 import androidx.appcompat.app.AppCompatDelegate
-import com.cysindex.telequant.map.TileSourceConfig
+import com.cysindex.telequant.map.MapEngine
 import com.cysindex.telequant.utils.PrefManager
 import com.google.android.material.color.DynamicColors
 import com.highcapable.yukihookapi.hook.xposed.application.ModuleApplication
@@ -20,8 +20,7 @@ class App : ModuleApplication() {
         // Material 3 dynamic color, replacing the unmaintained MonetCompat.
         DynamicColors.applyToActivitiesIfAvailable(this)
         AppCompatDelegate.setDefaultNightMode(PrefManager.darkTheme)
-        // osmdroid reads much of its configuration when a tile provider is
-        // constructed, so this has to run before any MapView exists.
-        TileSourceConfig.apply(this)
+        // Brings MapLibre's native renderer up before any MapView is inflated.
+        MapEngine.init(this)
     }
 }

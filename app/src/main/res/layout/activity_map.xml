@@ -24,9 +24,8 @@
 
 
 
-        <org.osmdroid.views.MapView
+        <org.maplibre.android.maps.MapView
             android:id="@+id/map_container"
-            layout="@layout/map_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 

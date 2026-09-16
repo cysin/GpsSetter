@@ -87,14 +87,10 @@
     <string name="recording_applied">Lieu appliqué</string>
     <string name="recording_failed">Échec de l\'enregistrement</string>
     <string name="offline_download">Télécharger cette zone</string>
-    <string name="offline_estimate">Zoom %1$d à %2$d : environ %3$d tuiles, soit %4$d Mo.\n\nLe nombre de tuiles quadruple à chaque niveau de zoom.</string>
     <string name="offline_start">Télécharger</string>
     <string name="offline_downloading">Téléchargement des tuiles</string>
-    <string name="offline_progress">%1$d sur %2$d tuiles</string>
     <string name="offline_done">Zone disponible hors ligne</string>
     <string name="offline_failed">Échec du téléchargement : %1$s</string>
-    <string name="offline_mode">Mode hors ligne</string>
-    <string name="offline_mode_summary">Utiliser uniquement le cache ; aucun téléchargement</string>
     <string name="tile_proxy">Proxy de tuiles</string>
     <string name="tile_proxy_summary">Récupérer les tuiles via un proxy HTTP local</string>
     <string name="tile_proxy_host">Hôte du proxy</string>
@@ -103,4 +99,9 @@
     <string name="joystick_speed">Vitesse du joystick</string>
     <string name="joystick_speed_summary">Mètres par seconde à pleine amplitude</string>
     <string name="joystick_readout">%1$.5f, %2$.5f  ·  %3$d m/s</string>
+    <string name="map_style">Style de carte</string>
+    <string name="search_results">Résultats de recherche</string>
+    <string name="turn_on_location">Activez la localisation</string>
+    <string name="offline_confirm">Télécharger les zooms %1$d à %2$d pour la zone visible ?\n\nTuiles vectorielles : toute la plage en une seule passe.</string>
+    <string name="offline_progress_pct">%1$d%%</string>
 </resources>

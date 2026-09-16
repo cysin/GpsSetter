@@ -7,14 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.location.Geocoder
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.inputmethod.EditorInfo
@@ -39,49 +37,53 @@ import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.R
 import com.cysindex.telequant.adapter.FavListAdapter
 import com.cysindex.telequant.databinding.ActivityMapBinding
-import com.cysindex.telequant.map.OfflineTileManager
-import com.cysindex.telequant.map.TileSourceConfig
+import com.cysindex.telequant.map.MapEngine
+import com.cysindex.telequant.map.Nominatim
+import com.cysindex.telequant.map.OfflineRegions
 import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
 import com.cysindex.telequant.utils.JoystickService
 import com.cysindex.telequant.utils.NotificationsChannel
 import com.cysindex.telequant.utils.PrefManager
-import com.cysindex.telequant.utils.ext.getAddress
 import com.cysindex.telequant.utils.ext.isNetworkConnected
 import com.cysindex.telequant.utils.ext.showToast
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.elevation.ElevationOverlayProvider
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Overlay
-import org.osmdroid.views.overlay.Polygon
-import java.io.IOException
-import java.util.regex.Matcher
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 import java.util.regex.Pattern
 import kotlin.properties.Delegates
 
 class MapActivity : AppCompatActivity() {
 
-    private val TAG = "TeleQuantMap"
     private val binding by lazy { ActivityMapBinding.inflate(layoutInflater) }
-    private lateinit var map: MapView
+    private lateinit var mapView: MapView
+    private var mapLibre: MapLibreMap? = null
+    private var style: Style? = null
+
     private val viewModel by viewModels<MainViewModel> { MainViewModel.Factory }
     private val notificationsChannel by lazy { NotificationsChannel() }
     private var favListAdapter: FavListAdapter = FavListAdapter()
-    private var mMarker: Marker? = null
-    private var mGeoPoint: GeoPoint? = null
-    private var jitterCircle: Polygon? = null
     private var lat by Delegates.notNull<Double>()
     private var lon by Delegates.notNull<Double>()
+    private var spoofing = false
     private var xposedDialog: AlertDialog? = null
     private lateinit var alertDialog: MaterialAlertDialogBuilder
     private lateinit var dialog: AlertDialog
@@ -114,13 +116,18 @@ class MapActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Brings the native renderer up; must precede inflating the MapView.
+        MapEngine.init(this)
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        // setContentView must run before anything touches `binding`; the previous
-        // version inflated it inside launchWhenCreated and then immediately called
-        // setSupportActionBar(binding.toolbar) on the main thread, racing the coroutine.
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
-        initializeMap()
+
+        lat = viewModel.getLat
+        lon = viewModel.getLng
+        spoofing = viewModel.isStarted
+
+        initializeMap(savedInstanceState)
         isModuleEnable()
         setBottomSheet()
         setUpNavigationView()
@@ -132,46 +139,222 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
+    // --- map ----------------------------------------------------------------
+
+    private fun initializeMap(savedInstanceState: Bundle?) {
+        mapView = binding.mapContainer
+        mapView.onCreate(savedInstanceState)
+        mapView.getMapAsync { map ->
+            mapLibre = map
+            map.cameraPosition = CameraPosition.Builder()
+                .target(LatLng(lat, lon))
+                .zoom(DEFAULT_ZOOM)
+                .build()
+
+            map.setStyle(MapEngine.styleUrl()) { loaded ->
+                style = loaded
+                // Sources and layers can only be added once the style is loaded.
+                installTargetLayers(loaded)
+                redrawTarget()
+            }
+
+            // Long press rather than tap: a tap cannot be told apart from the
+            // start of a pan, so tapping to place meant nudging the target
+            // constantly while navigating.
+            map.addOnMapLongClickListener { point ->
+                moveTarget(point.latitude, point.longitude, recentre = false)
+                true
+            }
+        }
+    }
+
+    /**
+     * Installs the two layers the target is drawn with.
+     *
+     * Core style layers rather than the annotation plugin: the newest plugin
+     * (3.0.2) is built against MapLibre 11.3.0 and would be force-upgraded two
+     * major versions to 13.6.1 here. That compiles but could break at runtime,
+     * which is the one thing that cannot be checked from a build machine.
+     */
+    private fun installTargetLayers(loaded: Style) {
+        loaded.addSource(GeoJsonSource(SOURCE_TARGET))
+        loaded.addSource(GeoJsonSource(SOURCE_JITTER))
+
+        val accent = MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary)
+
+        loaded.addLayer(
+            FillLayer(LAYER_JITTER_FILL, SOURCE_JITTER).withProperties(
+                PropertyFactory.fillColor(accent),
+                PropertyFactory.fillOpacity(0.18f)
+            )
+        )
+        loaded.addLayer(
+            LineLayer(LAYER_JITTER_LINE, SOURCE_JITTER).withProperties(
+                PropertyFactory.lineColor(accent),
+                PropertyFactory.lineWidth(1.5f)
+            )
+        )
+        loaded.addLayer(
+            SymbolLayer(LAYER_TARGET, SOURCE_TARGET).withProperties(
+                PropertyFactory.textField(Expression.get(PROP_LABEL)),
+                PropertyFactory.textSize(11f),
+                PropertyFactory.textOffset(arrayOf(0f, -1.2f)),
+                PropertyFactory.textHaloWidth(1.4f),
+                PropertyFactory.textHaloColor(Color.WHITE),
+                PropertyFactory.textColor(accent),
+                PropertyFactory.textAllowOverlap(true)
+            )
+        )
+    }
+
+    /** Redraws the target marker and its jitter radius from [lat]/[lon]. */
+    private fun redrawTarget() {
+        val loaded = style ?: return
+        val targetSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_TARGET) ?: return
+        val jitterSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_JITTER) ?: return
+
+        if (!spoofing) {
+            targetSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            jitterSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            return
+        }
+
+        val marker = Feature.fromGeometry(Point.fromLngLat(lon, lat)).apply {
+            addStringProperty(PROP_LABEL, "%.6f, %.6f".format(lat, lon))
+        }
+        targetSource.setGeoJson(marker)
+
+        val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
+        // Both branches must be the same type, or no setGeoJson overload matches.
+        jitterSource.setGeoJson(
+            FeatureCollection.fromFeatures(
+                if (radius > 0) listOf(jitterPolygon(lat, lon, radius)) else emptyList()
+            )
+        )
+    }
+
+    /**
+     * The jitter area as a geographic polygon rather than a pixel-radius
+     * circle, so it keeps matching the real radius at every zoom without being
+     * recomputed on each camera move.
+     */
+    private fun jitterPolygon(
+        centreLat: Double,
+        centreLon: Double,
+        radiusMetres: Double
+    ): Feature {
+        val ring = (0..CIRCLE_SEGMENTS).map { i ->
+            val angle = 2.0 * Math.PI * i / CIRCLE_SEGMENTS
+            val dEast = Math.cos(angle) * radiusMetres
+            val dNorth = Math.sin(angle) * radiusMetres
+            val dLat = Math.toDegrees(dNorth / EARTH_RADIUS_M)
+            val dLon = Math.toDegrees(
+                dEast / (EARTH_RADIUS_M * Math.cos(Math.toRadians(centreLat)))
+            )
+            Point.fromLngLat(centreLon + dLon, centreLat + dLat)
+        }
+        return Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
+    }
+
+    private fun moveTarget(newLat: Double, newLon: Double, recentre: Boolean) {
+        lat = newLat
+        lon = newLon
+        if (recentre) {
+            mapLibre?.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), DEFAULT_ZOOM)
+            )
+        }
+        if (!spoofing) {
+            // Nothing is drawn until spoofing starts, but the coordinates the
+            // start button will use have still changed.
+            return
+        }
+        redrawTarget()
+    }
+
+    // --- lifecycle ----------------------------------------------------------
+
+    override fun onStart() {
+        super.onStart()
+        mapView.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        mapView.onResume()
+        viewModel.updateXposedState()
+        // Radius or style may have been changed in settings while we were away.
+        redrawTarget()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mapView.onPause()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        mapView.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        mapView.onSaveInstanceState(outState)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        mapView.onLowMemory()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mapView.onDestroy()
+    }
+
+    // --- controls -----------------------------------------------------------
+
     @SuppressLint("MissingPermission")
     private fun setupButton() {
         binding.favourite.setOnClickListener { addFavouriteDialog() }
         binding.getlocationContainer.setOnClickListener { getLastLocation() }
 
-        if (viewModel.isStarted) {
-            binding.bottomSheetContainer.startSpoofing.visibility = View.GONE
-            binding.bottomSheetContainer.stopButton.visibility = View.VISIBLE
-        }
+        updateStartStopVisibility()
 
         binding.bottomSheetContainer.startSpoofing.setOnClickListener {
             if (!notificationsChannel.hasPermission(this)) {
                 requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
             viewModel.update(true, lat, lon)
-            mGeoPoint?.let { mMarker?.position = it }
-            showMarker()
-            binding.bottomSheetContainer.startSpoofing.visibility = View.GONE
-            binding.bottomSheetContainer.stopButton.visibility = View.VISIBLE
+            spoofing = true
+            updateStartStopVisibility()
+            redrawTarget()
             lifecycleScope.launch {
-                mGeoPoint?.getAddress(this@MapActivity)?.collect { value ->
-                    showStartNotification(value)
-                }
+                Nominatim.reverse(lat, lon)?.let { showStartNotification(it) }
             }
             showToast(getString(R.string.location_set))
         }
 
         binding.bottomSheetContainer.stopButton.setOnClickListener {
-            mGeoPoint?.let { viewModel.update(false, it.latitude, it.longitude) }
-            hideMarker()
-            binding.bottomSheetContainer.stopButton.visibility = View.GONE
-            binding.bottomSheetContainer.startSpoofing.visibility = View.VISIBLE
+            viewModel.update(false, lat, lon)
+            spoofing = false
+            updateStartStopVisibility()
+            redrawTarget()
             cancelNotification()
             showToast(getString(R.string.location_unset))
         }
     }
 
+    private fun updateStartStopVisibility() {
+        binding.bottomSheetContainer.startSpoofing.visibility =
+            if (spoofing) View.GONE else View.VISIBLE
+        binding.bottomSheetContainer.stopButton.visibility =
+            if (spoofing) View.VISIBLE else View.GONE
+    }
+
     private fun setDrawer() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        val mDrawerToggle = object : ActionBarDrawerToggle(
+        val drawerToggle = object : ActionBarDrawerToggle(
             this, binding.container, binding.toolbar,
             R.string.drawer_open, R.string.drawer_close
         ) {
@@ -185,37 +368,16 @@ class MapActivity : AppCompatActivity() {
                 invalidateOptionsMenu()
             }
         }
-        binding.container.addDrawerListener(mDrawerToggle)
+        binding.container.addDrawerListener(drawerToggle)
     }
 
     private fun setBottomSheet() {
         val bottom = BottomSheetBehavior.from(binding.bottomSheetContainer.bottomSheet)
-        with(binding.bottomSheetContainer) {
-            search.searchBox.setOnEditorActionListener { v, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                    if (isNetworkConnected()) {
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            val getInput = v.text.toString()
-                            if (getInput.isNotEmpty()) {
-                                when (val result = getSearchAddress(getInput)) {
-                                    is SearchProgress.Complete -> {
-                                        lat = result.lat
-                                        lon = result.lon
-                                        moveMapToNewLocation(true)
-                                    }
-
-                                    is SearchProgress.Fail -> showToast(result.error!!)
-                                    SearchProgress.Progress -> Unit
-                                }
-                            }
-                        }
-                    } else {
-                        showToast(getString(R.string.no_internet))
-                    }
-                    return@setOnEditorActionListener true
-                }
-                return@setOnEditorActionListener false
-            }
+        binding.bottomSheetContainer.search.searchBox.setOnEditorActionListener { v, actionId, _ ->
+            if (actionId != EditorInfo.IME_ACTION_SEARCH) return@setOnEditorActionListener false
+            val input = v.text.toString()
+            if (input.isNotEmpty()) search(input)
+            true
         }
 
         binding.mapContainer.setOnApplyWindowInsetsListener { _, insets ->
@@ -238,7 +400,50 @@ class MapActivity : AppCompatActivity() {
         bottom.state = BottomSheetBehavior.STATE_COLLAPSED
     }
 
-    /** Replaces MonetCompat; Material 3 dynamic color is applied app-wide in [App]. */
+    /**
+     * Coordinates are parsed locally; anything else goes to Nominatim. The
+     * platform Geocoder used before is backed by Play Services and returns
+     * nothing on devices without them, so place search simply never worked
+     * there.
+     */
+    private fun search(input: String) {
+        COORDINATE.matcher(input).takeIf { it.matches() }?.let { matcher ->
+            val parts = matcher.group().split(",")
+            val parsedLat = parts[0].trim().toDoubleOrNull()
+            val parsedLon = parts[1].trim().toDoubleOrNull()
+            if (parsedLat != null && parsedLon != null) {
+                moveTarget(parsedLat, parsedLon, recentre = true)
+                return
+            }
+        }
+
+        if (!isNetworkConnected()) {
+            showToast(getString(R.string.no_internet))
+            return
+        }
+
+        lifecycleScope.launch {
+            val results = Nominatim.search(input)
+            when {
+                results.isEmpty() -> showToast(getString(R.string.address_not_found))
+                results.size == 1 -> results[0].let {
+                    moveTarget(it.lat, it.lon, recentre = true)
+                }
+                else -> chooseSearchResult(results)
+            }
+        }
+    }
+
+    private fun chooseSearchResult(results: List<Nominatim.Place>) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.search_results)
+            .setItems(results.map { it.displayName }.toTypedArray()) { _, index ->
+                results[index].let { moveTarget(it.lat, it.lon, recentre = true) }
+            }
+            .show()
+    }
+
+    /** Replaces MonetCompat; Material 3 dynamic color is applied app-wide in App. */
     private fun applyThemeColors() {
         val surfaceVariant = MaterialColors.getColor(
             binding.root, com.google.android.material.R.attr.colorSurfaceVariant
@@ -256,8 +461,8 @@ class MapActivity : AppCompatActivity() {
 
     private fun setUpNavigationView() {
         binding.navView.setNavigationItemSelectedListener {
-            // AGP 9 compiles apps against non-final R fields, so resource ids can no
-            // longer appear in `when`/switch branches.
+            // AGP 9 compiles apps against non-final R fields, so resource ids can
+            // no longer appear in `when` branches.
             val id = it.itemId
             if (id == R.id.record_environment) {
                 recordEnvironment()
@@ -275,54 +480,6 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
-    private fun initializeMap() {
-        // Cache paths, user agent and the tile proxy are set once in App;
-        // re-applying the proxy here picks up a change made in settings.
-        TileSourceConfig.applyProxy()
-        map = binding.mapContainer
-        map.setTileSource(TileSourceFactory.MAPNIK)
-        map.setMultiTouchControls(true)
-        map.isTilesScaledToDpi = true
-        map.setUseDataConnection(!PrefManager.offlineMap)
-        map.maxZoomLevel = 22.0
-        map.minZoomLevel = 1.0
-
-        lat = viewModel.getLat
-        lon = viewModel.getLng
-
-        val mapController = map.controller
-        mGeoPoint = GeoPoint(lat, lon)
-        mapController.setZoom(16.0)
-        mapController.setCenter(mGeoPoint)
-
-        mMarker = Marker(map).apply {
-            position = mGeoPoint
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title = markerTitle(mGeoPoint)
-        }
-
-        // Long press rather than tap: a single tap is indistinguishable from the
-        // start of a pan, so tapping to place the target meant constantly moving
-        // it by accident while navigating the map.
-        map.overlays.add(object : Overlay() {
-            override fun onLongPress(e: MotionEvent?, mapView: MapView?): Boolean {
-                if (e == null || mapView == null) return false
-                val geoPoint = mapView.projection.fromPixels(e.x.toInt(), e.y.toInt())
-                onMapClick(GeoPoint(geoPoint.latitude, geoPoint.longitude))
-                return true
-            }
-        })
-
-        if (viewModel.isStarted) {
-            map.overlays.add(mMarker)
-        }
-        updateJitterCircle()
-        map.invalidate()
-    }
-
-    private fun markerTitle(point: GeoPoint?): String =
-        "Lat: %.6f, Lon: %.6f".format(point?.latitude ?: 0.0, point?.longitude ?: 0.0)
-
     private fun isModuleEnable() {
         viewModel.isXposed.observe(this) { isXposed ->
             xposedDialog?.dismiss()
@@ -338,76 +495,7 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
-    private fun onMapClick(geoPoint: GeoPoint) {
-        mGeoPoint = geoPoint
-        mMarker?.let { marker ->
-            marker.position = geoPoint
-            marker.title = markerTitle(geoPoint)
-            if (!map.overlays.contains(marker)) {
-                map.overlays.add(marker)
-            }
-            map.controller.animateTo(geoPoint)
-            lat = geoPoint.latitude
-            lon = geoPoint.longitude
-            updateJitterCircle()
-            map.invalidate()
-        }
-    }
-
-    /**
-     * Draws the jitter radius so the wander area is visible. Without it the
-     * reported position drifting away from the pin looks like a bug.
-     */
-    private fun updateJitterCircle() {
-        jitterCircle?.let { map.overlays.remove(it) }
-        jitterCircle = null
-
-        val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
-        val centre = mGeoPoint ?: return
-        if (radius <= 0.0) return
-
-        val outline = MaterialColors.getColor(
-            binding.root, androidx.appcompat.R.attr.colorPrimary
-        )
-        jitterCircle = Polygon(map).apply {
-            points = Polygon.pointsAsCircle(centre, radius)
-            fillPaint.color = ColorUtils.setAlphaComponent(outline, 40)
-            outlinePaint.color = ColorUtils.setAlphaComponent(outline, 160)
-            outlinePaint.strokeWidth = 3f
-            setOnClickListener { _, _, _ -> false }
-        }
-        // Below the marker so the pin stays tappable.
-        map.overlays.add(0, jitterCircle)
-    }
-
-    private fun moveMapToNewLocation(moveNewLocation: Boolean) {
-        if (!moveNewLocation) return
-        mGeoPoint = GeoPoint(lat, lon)
-        mGeoPoint?.let { geoPoint ->
-            map.controller.animateTo(geoPoint)
-            map.controller.setZoom(16.0)
-            mMarker?.position = geoPoint
-            mMarker?.title = markerTitle(geoPoint)
-            if (!map.overlays.contains(mMarker)) {
-                map.overlays.add(mMarker)
-            }
-            map.invalidate()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        map.onResume()
-        viewModel.updateXposedState()
-        // The radius may have been changed in settings while we were away.
-        updateJitterCircle()
-        map.invalidate()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        map.onPause()
-    }
+    // --- dialogs ------------------------------------------------------------
 
     private fun aboutDialog() {
         alertDialog = MaterialAlertDialogBuilder(this)
@@ -427,17 +515,12 @@ class MapActivity : AppCompatActivity() {
             val editText = view.findViewById<EditText>(R.id.search_edittxt)
             setTitle(getString(R.string.add_fav_dialog_title))
             setPositiveButton(getString(R.string.dialog_button_add)) { _, _ ->
-                val s = editText.text.toString()
-                if (!map.overlays.contains(mMarker)) {
-                    showToast(getString(R.string.location_not_select))
-                } else {
-                    viewModel.storeFavorite(s, lat, lon)
-                    viewModel.response.observe(this@MapActivity) {
-                        if (it == (-1).toLong()) {
-                            showToast(getString(R.string.cant_save))
-                        } else {
-                            showToast(getString(R.string.save))
-                        }
+                viewModel.storeFavorite(editText.text.toString(), lat, lon)
+                viewModel.response.observe(this@MapActivity) {
+                    if (it == (-1).toLong()) {
+                        showToast(getString(R.string.cant_save))
+                    } else {
+                        showToast(getString(R.string.save))
                     }
                 }
             }
@@ -454,10 +537,12 @@ class MapActivity : AppCompatActivity() {
         val rcv = view.findViewById<RecyclerView>(R.id.favorites_list)
         rcv.layoutManager = LinearLayoutManager(this)
         rcv.adapter = favListAdapter
-        favListAdapter.onItemClick = {
-            lat = it.lat!!
-            lon = it.lng!!
-            moveMapToNewLocation(true)
+        favListAdapter.onItemClick = { favourite ->
+            val favLat = favourite.lat
+            val favLon = favourite.lng
+            if (favLat != null && favLon != null) {
+                moveTarget(favLat, favLon, recentre = true)
+            }
             if (dialog.isShowing) dialog.dismiss()
         }
         favListAdapter.onItemDelete = { viewModel.deleteFavourite(it) }
@@ -475,44 +560,7 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun getSearchAddress(address: String): SearchProgress =
-        withContext(Dispatchers.IO) {
-            val matcher: Matcher = Pattern
-                .compile("[-+]?\\d{1,3}([.]\\d+)?, *[-+]?\\d{1,3}([.]\\d+)?")
-                .matcher(address)
-
-            if (matcher.matches()) {
-                delay(300)
-                val parts = matcher.group().split(",")
-                return@withContext SearchProgress.Complete(
-                    parts[0].trim().toDouble(),
-                    parts[1].trim().toDouble()
-                )
-            }
-
-            if (!isNetworkConnected()) {
-                return@withContext SearchProgress.Fail(getString(R.string.no_internet))
-            }
-
-            try {
-                val addressList = Geocoder(this@MapActivity).getFromLocationName(address, 3)
-                when {
-                    addressList.isNullOrEmpty() ->
-                        SearchProgress.Fail(getString(R.string.address_not_found))
-
-                    else -> SearchProgress.Complete(
-                        addressList[0].latitude,
-                        addressList[0].longitude
-                    )
-                }
-            } catch (e: IOException) {
-                Log.e(TAG, "Geocoding error", e)
-                SearchProgress.Fail(getString(R.string.address_not_found))
-            } catch (e: IllegalArgumentException) {
-                Log.e(TAG, "Invalid address input", e)
-                SearchProgress.Fail(getString(R.string.enter_valid_input))
-            }
-        }
+    // --- notifications ------------------------------------------------------
 
     private fun showStartNotification(address: String) {
         notificationsChannel.showNotification(this) {
@@ -529,9 +577,11 @@ class MapActivity : AppCompatActivity() {
         notificationsChannel.cancelAllNotifications(this)
     }
 
+    // --- device location ----------------------------------------------------
+
     /**
-     * Uses the platform LocationManager instead of Play Services so the app works
-     * on GMS-free devices (a realistic case for a rooted/Xposed audience).
+     * Uses the platform LocationManager instead of Play Services, so this works
+     * on GMS-free devices — a realistic case for a rooted audience.
      */
     @SuppressLint("MissingPermission")
     private fun getLastLocation() {
@@ -546,7 +596,7 @@ class MapActivity : AppCompatActivity() {
             else -> null
         }
         if (provider == null) {
-            showToast("Turn on location")
+            showToast(getString(R.string.turn_on_location))
             startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             return
         }
@@ -554,9 +604,7 @@ class MapActivity : AppCompatActivity() {
             if (location == null) {
                 showToast(getString(R.string.address_not_found))
             } else {
-                lat = location.latitude
-                lon = location.longitude
-                moveMapToNewLocation(true)
+                moveTarget(location.latitude, location.longitude, recentre = true)
             }
         }
     }
@@ -591,6 +639,8 @@ class MapActivity : AppCompatActivity() {
             getLastLocation()
         }
     }
+
+    // --- recording ----------------------------------------------------------
 
     /** Permissions the recorder wants, filtered to those not already held. */
     private fun missingRecordingPermissions(): Array<String> = buildList {
@@ -635,10 +685,14 @@ class MapActivity : AppCompatActivity() {
     private fun showRecordingResult(result: EnvironmentRecorder.Result) {
         val env = result.environment
         val summary = buildString {
-            append(getString(R.string.recording_summary, env.cells.size, env.wifis.size, env.beacons.size))
+            append(
+                getString(
+                    R.string.recording_summary,
+                    env.cells.size, env.wifis.size, env.beacons.size
+                )
+            )
             if (result.missing.isNotEmpty()) {
-                append("\n\n")
-                append(getString(R.string.recording_missing))
+                append("\n\n").append(getString(R.string.recording_missing))
                 result.missing.forEach { append("\n  • ").append(it) }
             }
         }
@@ -649,9 +703,7 @@ class MapActivity : AppCompatActivity() {
             .setPositiveButton(R.string.recording_use) { _, _ ->
                 PrefManager.activeEnvironment = env.toJson().toString()
                 if (env.lat != 0.0 || env.lng != 0.0) {
-                    lat = env.lat
-                    lon = env.lng
-                    moveMapToNewLocation(true)
+                    moveTarget(env.lat, env.lng, recentre = true)
                 }
                 showToast(getString(R.string.recording_applied))
             }
@@ -659,78 +711,83 @@ class MapActivity : AppCompatActivity() {
             .show()
     }
 
+    // --- offline ------------------------------------------------------------
+
     /**
-     * Downloads the tiles for the current viewport. The estimate is shown first
-     * because tile count grows fourfold per zoom level, so a range that looks
-     * modest can run to hundreds of megabytes.
+     * Downloads the current viewport for offline use through MapLibre's own
+     * offline store.
+     *
+     * This is legitimate only because the tiles come from OpenFreeMap, which
+     * places no limits on requests. The OSM Foundation's policy bans
+     * pre-fetching from tile.openstreetmap.org outright, so the previous raster
+     * implementation would have got the client blocked.
      */
     private fun downloadCurrentArea() {
-        val area = map.boundingBox
-        val zoomMin = map.zoomLevelDouble.toInt().coerceAtLeast(1)
-        val zoomMax = (zoomMin + OFFLINE_EXTRA_ZOOM).coerceAtMost(19)
-        val manager = OfflineTileManager(map)
-        val estimate = manager.estimate(area, zoomMin, zoomMax)
+        val map = mapLibre ?: return
+        val bounds = map.projection.visibleRegion.latLngBounds
+        val minZoom = map.cameraPosition.zoom.coerceAtLeast(1.0)
+        val maxZoom = (minZoom + OFFLINE_EXTRA_ZOOM).coerceAtMost(16.0)
 
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.offline_download)
-            .setMessage(
-                getString(
-                    R.string.offline_estimate,
-                    zoomMin, zoomMax, estimate.tileCount, estimate.approxBytes / (1024 * 1024)
-                )
-            )
+            .setMessage(getString(R.string.offline_confirm, minZoom.toInt(), maxZoom.toInt()))
             .setPositiveButton(R.string.offline_start) { _, _ ->
-                val progress = MaterialAlertDialogBuilder(this)
-                    .setTitle(R.string.offline_downloading)
-                    .setMessage(getString(R.string.offline_progress, 0, estimate.tileCount))
-                    .setCancelable(false)
-                    .show()
-                manager.download(
-                    context = this,
-                    area = area,
-                    zoomMin = zoomMin,
-                    zoomMax = zoomMax,
-                    onProgress = { done, total ->
-                        progress.setMessage(getString(R.string.offline_progress, done, total))
-                    },
-                    onFinished = {
-                        progress.dismiss()
-                        showToast(getString(R.string.offline_done))
-                    },
-                    onFailed = { reason ->
-                        progress.dismiss()
-                        showToast(getString(R.string.offline_failed, reason))
-                    }
-                )
+                runOfflineDownload(bounds, minZoom, maxZoom)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private fun showMarker() {
-        if (mMarker != null && !map.overlays.contains(mMarker)) {
-            map.overlays.add(mMarker)
-            map.invalidate()
-        }
-    }
+    private fun runOfflineDownload(
+        bounds: org.maplibre.android.geometry.LatLngBounds,
+        minZoom: Double,
+        maxZoom: Double
+    ) {
+        val progress = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.offline_downloading)
+            .setMessage(getString(R.string.offline_progress_pct, 0))
+            .setCancelable(false)
+            .show()
 
-    private fun hideMarker() {
-        if (mMarker != null) {
-            map.overlays.remove(mMarker)
-            map.invalidate()
-        }
+        OfflineRegions(this).download(
+            name = "%.4f,%.4f".format(bounds.center.latitude, bounds.center.longitude),
+            bounds = bounds,
+            minZoom = minZoom,
+            maxZoom = maxZoom,
+            pixelRatio = resources.displayMetrics.density,
+            onProgress = {
+                progress.setMessage(
+                    getString(R.string.offline_progress_pct, (it.fraction * 100).toInt())
+                )
+            },
+            onComplete = {
+                progress.dismiss()
+                showToast(getString(R.string.offline_done))
+            },
+            onError = { reason ->
+                progress.dismiss()
+                showToast(getString(R.string.offline_failed, reason))
+            }
+        )
     }
 
     private companion object {
         const val PERMISSION_ID = 42
+        const val DEFAULT_ZOOM = 15.0
 
-        /** Zoom levels below the current one to also fetch when going offline. */
-        const val OFFLINE_EXTRA_ZOOM = 3
+        /** Zoom levels beyond the current one to also fetch when going offline. */
+        const val OFFLINE_EXTRA_ZOOM = 3.0
+
+        const val SOURCE_TARGET = "telequant-target"
+        const val SOURCE_JITTER = "telequant-jitter"
+        const val LAYER_TARGET = "telequant-target-label"
+        const val LAYER_JITTER_FILL = "telequant-jitter-fill"
+        const val LAYER_JITTER_LINE = "telequant-jitter-line"
+        const val PROP_LABEL = "label"
+        const val CIRCLE_SEGMENTS = 64
+        const val EARTH_RADIUS_M = 6378137.0
+
+        val COORDINATE: Pattern =
+            Pattern.compile("[-+]?\\d{1,3}([.]\\d+)?, *[-+]?\\d{1,3}([.]\\d+)?")
     }
-}
-
-sealed class SearchProgress {
-    data object Progress : SearchProgress()
-    data class Complete(val lat: Double, val lon: Double) : SearchProgress()
-    data class Fail(val error: String?) : SearchProgress()
 }

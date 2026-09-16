@@ -121,11 +121,13 @@
             android:summary="%s"
             android:title="@string/tile_proxy_port" />
 
-        <rikka.material.preference.MaterialSwitchPreference
-            android:defaultValue="false"
-            android:key="offline_map"
-            android:summary="@string/offline_mode_summary"
-            android:title="@string/offline_mode" />
+        <rikka.preference.SimpleMenuPreference
+            android:defaultValue="liberty"
+            android:entries="@array/map_style_texts"
+            android:entryValues="@array/map_style_values"
+            android:key="map_style"
+            android:summary="%s"
+            android:title="@string/map_style" />
 
     </PreferenceCategory>
 

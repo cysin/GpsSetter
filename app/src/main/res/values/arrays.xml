@@ -37,4 +37,18 @@
         <item>DRIVING</item>
     </string-array>
 
+
+    <!-- OpenFreeMap style names; values must match MapEngine -->
+    <string-array name="map_style_texts">
+        <item>Liberty</item>
+        <item>Bright</item>
+        <item>Positron</item>
+    </string-array>
+
+    <string-array name="map_style_values" translatable="false">
+        <item>liberty</item>
+        <item>bright</item>
+        <item>positron</item>
+    </string-array>
+
 </resources>

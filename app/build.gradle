@@ -19,6 +19,16 @@ android {
         versionName tagName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TAG_NAME", "\"${tagName}\"")
+
+        /*
+         * MapLibre ships native renderers for four ABIs, which would add ~20 MB.
+         * This module needs Android 11+ with Magisk/KernelSU and Zygisk, and in
+         * practice every such device is arm64. Dropping the rest keeps the APK
+         * reasonable; add them back here if 32-bit support is ever needed.
+         */
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
     }
 
     /*
@@ -118,7 +128,19 @@ dependencies {
     }
 
     implementation 'com.facebook.shimmer:shimmer:0.5.0'
-    implementation 'org.osmdroid:osmdroid-android:6.1.20'
+
+    /*
+     * MapLibre Native replaces osmdroid, which was archived in November 2024.
+     * The same renderer draws online and offline, so a downloaded region looks
+     * identical to the live map — two separate pipelines never could.
+     *
+     * Pinned explicitly: the Maven "release" marker currently points at
+     * 13.6.1-pre0, a pre-release, so anything resolving "latest" gets that.
+     */
+    implementation 'org.maplibre.gl:android-sdk:13.6.1'
+
+    // Geocoding against Nominatim; the platform Geocoder needs Play Services.
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // The library has no tags or releases, so pin the JitPack build to a commit
     // instead of the floating ':master' the project used before.
     implementation 'com.github.controlwear:virtual-joystick-android:fda1c916b6'
