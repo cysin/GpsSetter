@@ -21,10 +21,44 @@ android {
         buildConfigField("String", "TAG_NAME", "\"${tagName}\"")
     }
 
+    /*
+     * Signing credentials come from Gradle properties, normally set in the
+     * user's ~/.gradle/gradle.properties, so no keystore path or password ever
+     * reaches this repository. Without them the release variant still builds,
+     * just unsigned — a clone stays buildable for anyone.
+     */
+    signingConfigs {
+        release {
+            def storePath = project.findProperty('TELEQUANT_STORE_FILE')
+            if (storePath && file(storePath).exists()) {
+                storeFile file(storePath)
+                storePassword project.findProperty('TELEQUANT_STORE_PASSWORD')
+                keyAlias project.findProperty('TELEQUANT_KEY_ALIAS')
+                keyPassword project.findProperty('TELEQUANT_KEY_PASSWORD')
+
+                // v1 is unnecessary at minSdk 30 and slows installation. v3
+                // carries the key-rotation record, so the signing key can be
+                // replaced later without orphaning existing installs.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // R8 is deliberately off. The framework locates this module through
+            // the class named in assets/xposed_init, and the hooks reach hidden
+            // platform methods (ScanRecord.parseFromBytes, WifiSsid.fromBytes)
+            // by reflection — obfuscation breaks both, silently.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            def storePath = project.findProperty('TELEQUANT_STORE_FILE')
+            if (storePath && file(storePath).exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
