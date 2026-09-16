@@ -13,20 +13,6 @@
             android:summary="%s"
             android:title="@string/dark_theme" />
 
-        <EditTextPreference
-            android:defaultValue="8"
-            android:digits="0123456789"
-            android:key="joystick_speed"
-            android:summary="@string/joystick_speed_summary"
-            android:title="@string/joystick_speed" />
-
-        <Preference
-            android:title="Add Joystick"
-            android:key="isJoyStickEnable"
-            android:icon="@drawable/outline_joystick"
-            android:summary="%s"
-            android:defaultValue="false"/>
-
 
 
     </PreferenceCategory>
@@ -128,6 +114,12 @@
             android:key="map_style"
             android:summary="%s"
             android:title="@string/map_style" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="offline_map"
+            android:summary="@string/offline_mode_summary"
+            android:title="@string/offline_mode" />
 
     </PreferenceCategory>
 

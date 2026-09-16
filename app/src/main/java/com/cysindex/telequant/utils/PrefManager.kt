@@ -37,7 +37,6 @@ object PrefManager   {
     private const val TILE_PROXY_HOST = "tile_proxy_host"
     private const val TILE_PROXY_PORT = "tile_proxy_port"
     private const val OFFLINE_MAP = "offline_map"
-    private const val JOYSTICK_SPEED = "joystick_speed"
     private const val MAP_STYLE = "map_style"
 
 
@@ -96,10 +95,6 @@ object PrefManager   {
         get() = pref.getInt(DARK_THEME, DayNightDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         set(value) = pref.edit().putInt(DARK_THEME, value).apply()
 
-    var isJoyStickEnable: Boolean
-    get() = pref.getBoolean("isJoyStickEnable",false)
-    set(value) = pref.edit().putBoolean("isJoyStickEnable",value).apply()
-
     /**
      * Wander radius in metres; 0 pins the position exactly. Replaces the old
      * boolean "random position", which the jitter engine no longer reads.
@@ -151,11 +146,6 @@ object PrefManager   {
     var tileProxyPort: String?
         get() = pref.getString(TILE_PROXY_PORT, "33009")
         set(value) { pref.edit().putString(TILE_PROXY_PORT, value).apply() }
-
-    /** Joystick travel speed in metres per second at full deflection. */
-    var joystickSpeed: String?
-        get() = pref.getString(JOYSTICK_SPEED, "8")
-        set(value) { pref.edit().putString(JOYSTICK_SPEED, value).apply() }
 
     /** OpenFreeMap style name: liberty, bright or positron. */
     var mapStyle: String?

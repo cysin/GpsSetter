@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.util.TimeZone
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Captures the radio environment at the device's current position.
@@ -60,7 +61,10 @@ class EnvironmentRecorder(private val context: Context) {
     )
 
     suspend fun record(): Result = withContext(Dispatchers.IO) {
-        val missing = mutableListOf<String>()
+        // Five captures append to this concurrently; a plain ArrayList would
+        // drop entries or corrupt itself, and the whole point of the list is to
+        // tell the user which signals are absent.
+        val missing = CopyOnWriteArrayList<String>()
 
         coroutineScope {
             val locationJob = async { captureLocation(missing) }
@@ -92,7 +96,7 @@ class EnvironmentRecorder(private val context: Context) {
                     timeZoneId = TimeZone.getDefault().id,
                     recordedAt = System.currentTimeMillis()
                 ),
-                missing = missing
+                missing = missing.toList()
             )
         }
     }

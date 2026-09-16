@@ -236,8 +236,10 @@ object LocationHooks : YukiBaseHooker() {
                     LocationDispatcher.DeliveryTarget.of(looper)
                 }
 
-                LocationDispatcher.register(listener, provider, interval, target) { location ->
-                    runCatching { listener.onLocationChanged(location) }
+                // The listener arrives as a parameter rather than being captured,
+                // so the scheduled task holds no strong reference to it.
+                LocationDispatcher.register(listener, provider, interval, target) { target, location ->
+                    runCatching { (target as? LocationListener)?.onLocationChanged(location) }
                 }
             }
         }

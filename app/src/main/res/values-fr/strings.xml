@@ -3,22 +3,17 @@
     <!--Home-->
 
     <string name="app_name">Régulateur GPS</string>
-    <string name="title_activity_maps">ActivitéMaps</string>
     <string name="xposed_desc">Définir localisation</string>
     <string name="search">Rechercher</string>
-    <string name="location_not_select">Lieu non sélectionné</string>
     <string name="save">sauvegarder</string>
     <string name="address">Etats Unis</string>
-    <string name="add_favourite">Ajouter le favoris</string>
-    <string name="add_fav_in_database">Ajouter favoris à la base de données</string>
-    <string name="show_fav_list">Afficher la liste des favoris</string>
     <string name="favourites">Favoris</string>
     <string name="address_not_found">Addresse introuvable</string>
     <string name="cant_save">Enregistrement impossible</string>
     <string name="location_set">Définir localisation</string>
     <string name="location_unset">Localisation non définie</string>
     <string name="no_internet">Pas d\’internet</string>
-    <string name="search_hint">"rechercher par exemple new york ou 37.7749,-122.4194"</string>
+    <string name="search_hint">Nom du lieu, ou 39.9042,116.4074</string>
     <string name="title">Notification de l\’emplacement définie</string>
     <string name="des">Afficher une notification lorsce que la localisation sera définie</string>
 
@@ -28,14 +23,9 @@
     <!-- Errors -->
     <string name="error_xposed_module_missing">Le module n\’est pas activé</string>
     <string name="error_xposed_module_missing_desc">Activer ce module dans LSPosed Manager.\n\nVous n\’avez pas LSPosed?\n\t1. Installer le module Riru ou Zygisk depuis from Magisk Manager\n\t2. Installer le module “Riru ou Zygisk - LSPosed” depuis Magisk Manager\n\t3. Ouvrir à nouveau cette application</string>
-    <string name="error_missing_root">Pas d\’accès raçine</string>
-    <string name="error_missing_root_desc">L\’accès raçine est nécessaire pour que cette application puisse gérrer les surcouches et fonctionner correctement.</string>
-
-
     <!-- About -->
 
     <string name="about">A propos</string>
-    <string name="about_tittle">Régulateur GPS</string>
     <string name="about_info">Un module qui définira votre localisation où que vous le vouliez sans activer la localisation.</string>
 
     <!-- Update -->
@@ -51,8 +41,6 @@
     <string name="title_activity_settings">Réglges</string>
     <!--Dialog-->
 
-    <string name="progress_dialog_searching">Recherche…</string>
-    <string name="dialog_button_ok">OK</string>
     <string name="add_fav_dialog_title">Ajouter favoris</string>
     <string name="dialog_button_add">Ajouter</string>
 
@@ -61,7 +49,6 @@
     <string name="drawer_close">fermer</string>
     <string name="stop">Arrêter</string>
     <string name="start_spoofing">Définir la position</string>
-    <string name="current_address">adresse actuelle</string>
     <string name="jitter_radius">Rayon de variation</string>
     <string name="jitter_radius_summary">Mètres sur lesquels la position signalée peut varier. 0 la fixe exactement.</string>
     <string name="jitter_mode">Type de déplacement</string>
@@ -96,12 +83,12 @@
     <string name="tile_proxy_host">Hôte du proxy</string>
     <string name="tile_proxy_port">Port du proxy</string>
     <string name="map_category">Carte</string>
-    <string name="joystick_speed">Vitesse du joystick</string>
-    <string name="joystick_speed_summary">Mètres par seconde à pleine amplitude</string>
-    <string name="joystick_readout">%1$.5f, %2$.5f  ·  %3$d m/s</string>
     <string name="map_style">Style de carte</string>
     <string name="search_results">Résultats de recherche</string>
     <string name="turn_on_location">Activez la localisation</string>
     <string name="offline_confirm">Télécharger les zooms %1$d à %2$d pour la zone visible ?\n\nTuiles vectorielles : toute la plage en une seule passe.</string>
     <string name="offline_progress_pct">%1$d%%</string>
+    <string name="offline_mode">Hors ligne uniquement</string>
+    <string name="offline_mode_summary">Utiliser les zones téléchargées, sans jamais récupérer de tuiles</string>
+    <string name="address_looking_up">Recherche de l\'adresse…</string>
 </resources>

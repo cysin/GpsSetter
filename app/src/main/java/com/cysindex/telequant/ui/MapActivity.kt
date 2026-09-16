@@ -42,7 +42,6 @@ import com.cysindex.telequant.map.Nominatim
 import com.cysindex.telequant.map.OfflineRegions
 import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
-import com.cysindex.telequant.utils.JoystickService
 import com.cysindex.telequant.utils.NotificationsChannel
 import com.cysindex.telequant.utils.PrefManager
 import com.cysindex.telequant.utils.ext.isNetworkConnected
@@ -51,6 +50,8 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.elevation.ElevationOverlayProvider
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -84,6 +85,8 @@ class MapActivity : AppCompatActivity() {
     private var lat by Delegates.notNull<Double>()
     private var lon by Delegates.notNull<Double>()
     private var spoofing = false
+    private var baseSearchBottomMargin = -1
+    private var addressJob: Job? = null
     private var xposedDialog: AlertDialog? = null
     private lateinit var alertDialog: MaterialAlertDialogBuilder
     private lateinit var dialog: AlertDialog
@@ -134,9 +137,6 @@ class MapActivity : AppCompatActivity() {
         applyThemeColors()
         setupButton()
         setDrawer()
-        if (PrefManager.isJoyStickEnable) {
-            startService(Intent(this, JoystickService::class.java))
-        }
     }
 
     // --- map ----------------------------------------------------------------
@@ -156,6 +156,7 @@ class MapActivity : AppCompatActivity() {
                 // Sources and layers can only be added once the style is loaded.
                 installTargetLayers(loaded)
                 redrawTarget()
+                updateAddressLabel()
             }
 
             // Long press rather than tap: a tap cannot be told apart from the
@@ -213,12 +214,9 @@ class MapActivity : AppCompatActivity() {
         val targetSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_TARGET) ?: return
         val jitterSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_JITTER) ?: return
 
-        if (!spoofing) {
-            targetSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
-            jitterSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
-            return
-        }
-
+        // Drawn whether or not spoofing is running: the marker is how the user
+        // sees where they just long-pressed, and hiding it until the start
+        // button was pressed meant placing a target produced no feedback at all.
         val marker = Feature.fromGeometry(Point.fromLngLat(lon, lat)).apply {
             addStringProperty(PROP_LABEL, "%.6f, %.6f".format(lat, lon))
         }
@@ -231,6 +229,29 @@ class MapActivity : AppCompatActivity() {
                 if (radius > 0) listOf(jitterPolygon(lat, lon, radius)) else emptyList()
             )
         )
+    }
+
+    /**
+     * Reverse-geocodes the current target into the bottom sheet.
+     *
+     * Debounced through a single job: long-pressing repeatedly would otherwise
+     * fire one Nominatim request per press, and their usage policy asks for
+     * about one request per second.
+     */
+    private fun updateAddressLabel() {
+        val label = binding.bottomSheetContainer.firstAddress
+        addressJob?.cancel()
+        label.text = getString(R.string.address_looking_up)
+        addressJob = lifecycleScope.launch {
+            delay(ADDRESS_DEBOUNCE_MS)
+            val requestedLat = lat
+            val requestedLon = lon
+            val name = Nominatim.reverse(requestedLat, requestedLon)
+            // The target may have moved again while the request was in flight.
+            if (requestedLat == lat && requestedLon == lon) {
+                label.text = name ?: "%.6f, %.6f".format(lat, lon)
+            }
+        }
     }
 
     /**
@@ -264,12 +285,8 @@ class MapActivity : AppCompatActivity() {
                 CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), DEFAULT_ZOOM)
             )
         }
-        if (!spoofing) {
-            // Nothing is drawn until spoofing starts, but the coordinates the
-            // start button will use have still changed.
-            return
-        }
         redrawTarget()
+        updateAddressLabel()
     }
 
     // --- lifecycle ----------------------------------------------------------
@@ -329,9 +346,10 @@ class MapActivity : AppCompatActivity() {
             spoofing = true
             updateStartStopVisibility()
             redrawTarget()
-            lifecycleScope.launch {
-                Nominatim.reverse(lat, lon)?.let { showStartNotification(it) }
-            }
+            showStartNotification(
+                binding.bottomSheetContainer.firstAddress.text.toString()
+                    .ifBlank { "%.6f, %.6f".format(lat, lon) }
+            )
             showToast(getString(R.string.location_set))
         }
 
@@ -390,7 +408,11 @@ class MapActivity : AppCompatActivity() {
 
             val searchParams =
                 binding.bottomSheetContainer.searchLayout.layoutParams as MarginLayoutParams
-            searchParams.bottomMargin = bottomInset + searchParams.bottomMargin
+            // Insets are delivered again on rotation and whenever the keyboard
+            // appears. Adding to the current margin each time walked the search
+            // box down the screen, so base it on the value from the layout.
+            if (baseSearchBottomMargin < 0) baseSearchBottomMargin = searchParams.bottomMargin
+            searchParams.bottomMargin = baseSearchBottomMargin + bottomInset
             binding.navView.setPadding(0, topInset, 0, 0)
 
             @Suppress("DEPRECATION")
@@ -774,6 +796,7 @@ class MapActivity : AppCompatActivity() {
     private companion object {
         const val PERMISSION_ID = 42
         const val DEFAULT_ZOOM = 15.0
+        const val ADDRESS_DEBOUNCE_MS = 600L
 
         /** Zoom levels beyond the current one to also fetch when going offline. */
         const val OFFLINE_EXTRA_ZOOM = 3.0

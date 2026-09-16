@@ -9,9 +9,6 @@ interface FavouriteDao {
         @Insert(onConflict = OnConflictStrategy.IGNORE)
         suspend fun insertToRoomDatabase(favourite: Favourite) : Long
 
-        // for update single favourite
-        @Update
-        suspend fun updateUserDetails(favourite: Favourite)
 
         //delete single favourite
         @Delete
@@ -22,10 +19,6 @@ interface FavouriteDao {
         @Query("SELECT * FROM favourite ORDER BY id DESC")
         fun getAllFavourites() : Flow<List<Favourite>>
 
-        //get single favourite inserted to room database
-        @Transaction
-        @Query("SELECT * FROM favourite WHERE id = :id")
-        suspend fun getSingleFavourite(id: Long) : Favourite?
 
 
 

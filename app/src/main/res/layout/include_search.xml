@@ -21,7 +21,7 @@
         android:background="@drawable/search_box_background"
         android:drawableStart="@drawable/ic_baseline_search_24"
         android:drawablePadding="@dimen/padding_16"
-        android:hint="@string/search"
+        android:hint="@string/search_hint"
         android:imeOptions="actionSearch"
         android:inputType="text"
         android:paddingStart="@dimen/padding_16"

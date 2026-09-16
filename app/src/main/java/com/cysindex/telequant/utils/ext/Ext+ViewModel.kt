@@ -12,11 +12,6 @@ fun ViewModel.onIO(body: suspend () -> Unit): Job {
     }
 }
 
-fun ViewModel.onDefault(body: suspend () -> Unit): Job {
-    return viewModelScope.launch(Dispatchers.Default) {
-        body()
-    }
-}
 
 fun ViewModel.onMain(body: suspend () -> Unit): Job {
     return viewModelScope.launch(Dispatchers.Main) {

@@ -17,7 +17,4 @@ class FavouriteRepository(private val favouriteDao: FavouriteDao) {
     suspend fun deleteFavourite(favourite: Favourite) {
         favouriteDao.deleteSingleFavourite(favourite)
     }
-
-    suspend fun getSingleFavourite(id: Long): Favourite? =
-        favouriteDao.getSingleFavourite(id)
 }

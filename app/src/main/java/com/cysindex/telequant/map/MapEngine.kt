@@ -43,6 +43,25 @@ object MapEngine {
         applyHttpStack()
         MapLibre.getInstance(context.applicationContext)
         initialised = true
+        applyConnectivity()
+    }
+
+    /**
+     * Forces MapLibre to treat the device as offline, so it serves only what a
+     * downloaded region already holds and never spends data on tiles. Without
+     * this the renderer happily fetches whatever is missing from the region.
+     */
+    fun applyConnectivity() {
+        if (!initialised) return
+        runCatching {
+            if (PrefManager.offlineMap) {
+                MapLibre.setConnected(false)
+            } else {
+                // null hands connectivity back to the system's own state rather
+                // than pinning it to "connected".
+                MapLibre.setConnected(null)
+            }
+        }.onFailure { Timber.tag(TAG).w(it, "connectivity override") }
     }
 
     fun styleUrl(): String = when (PrefManager.mapStyle) {

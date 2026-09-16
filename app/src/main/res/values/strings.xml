@@ -3,13 +3,9 @@
     <!-- Home -->
 
     <string name="app_name">TeleQuant</string>
-    <string name="title_activity_maps">MapsActivity</string>
     <string name="xposed_desc">Set location</string>
     <string name="search">Search</string>
     <string name="address">United States</string>
-    <string name="add_favourite">Add favourite</string>
-    <string name="add_fav_in_database">Add fav in database</string>
-    <string name="show_fav_list">Show fav list</string>
     <string name="favourites">Favourites</string>
     <string name="address_not_found">Address not found</string>
     <string name="cant_save">Can\'t save</string>
@@ -18,37 +14,23 @@
     <string name="des">Show notification when location will set</string>
     <string name="location_unset">Location unset</string>
     <string name="no_internet">No internet</string>
-    <string name="search_hint">"search eg. new york or 37.7749,-122.4194"</string>
+    <string name="search_hint">Place name, or 39.9042,116.4074</string>
 
 
 
     <!-- Errors -->
     <string name="error_xposed_module_missing">Xposed module is not enabled</string>
     <string name="error_xposed_module_missing_desc">Enable this module in LSPosed Manager.\n\nDon’t have LSPosed?\n\t1. Install the Riru or Zygisk module from Magisk Manager\n\t2. Install the “Riru or Zygisk - LSPosed” module from Magisk Manager\n\t3. Open this app again</string>
-    <string name="error_missing_root">No root access</string>
-    <string name="error_missing_root_desc">Root access is necessary in order for this app to manage overlays and work properly.</string>
-
-
-
-
-
     <!-- About -->
 
     <string name="about">About</string>
-    <string name="about_tittle">TeleQuant</string>
     <string name="about_info">A module which will set your location where you want without enable mock location.</string>
 
     <!-- Dialog -->
 
     <string name="add_fav_dialog_title">Add favourite</string>
     <string name="dialog_button_add">Add</string>
-    <string name="dialog_button_ok">OK</string>
-    <string name="location_not_select">Location not select</string>
     <string name="save">Save</string>
-    <string name="progress_dialog_searching">Searching...</string>
-
-
-
     <!-- SettingActivity -->
 
     <string name="xposed">Xposed</string>
@@ -76,10 +58,6 @@
     <string name="drawer_close">close</string>
     <string name="stop">Stop</string>
     <string name="start_spoofing">Set location</string>
-    <string name="current_address">current address</string>
-
-
-
     <!-- Environment recording -->
     <string name="record_environment">Record this place</string>
     <string name="recording_title">Recording</string>
@@ -105,12 +83,12 @@
     <string name="tile_proxy_port">Proxy port</string>
     <string name="map_category">Map</string>
 
-    <string name="joystick_speed">Joystick speed</string>
-    <string name="joystick_speed_summary">Metres per second at full deflection</string>
-    <string name="joystick_readout">%1$.5f, %2$.5f  ·  %3$d m/s</string>
     <string name="map_style">Map style</string>
     <string name="search_results">Search results</string>
     <string name="turn_on_location">Turn on location</string>
     <string name="offline_confirm">Download zoom %1$d to %2$d for the visible area?\n\nVector tiles, so the whole range comes in one pass.</string>
     <string name="offline_progress_pct">%1$d%%</string>
+    <string name="offline_mode">Offline only</string>
+    <string name="offline_mode_summary">Draw from downloaded regions and never fetch tiles</string>
+    <string name="address_looking_up">Looking up address…</string>
 </resources>
