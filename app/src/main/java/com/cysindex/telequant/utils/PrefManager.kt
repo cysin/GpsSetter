@@ -18,8 +18,11 @@ object PrefManager   {
     // These keys are the contract with the hooked process; PrefsBridge reads
     // the same file through XSharedPreferences, so the two must stay in step.
     private const val START = "start"
-    private const val LATITUDE = "latitude"
-    private const val LONGITUDE = "longitude"
+    // Double-bit keys; the *_FLOAT names are what older builds wrote.
+    private const val LATITUDE = "latitude_d"
+    private const val LONGITUDE = "longitude_d"
+    private const val LATITUDE_FLOAT = "latitude"
+    private const val LONGITUDE_FLOAT = "longitude"
     private const val ACCURACY_SETTING = "accuracy_settings"
     private const val DARK_THEME = "dark_theme"
     private const val JITTER_RADIUS = "jitter_radius"
@@ -34,6 +37,7 @@ object PrefManager   {
     private const val TILE_PROXY_HOST = "tile_proxy_host"
     private const val TILE_PROXY_PORT = "tile_proxy_port"
     private const val OFFLINE_MAP = "offline_map"
+    private const val JOYSTICK_SPEED = "joystick_speed"
 
 
     private val pref: SharedPreferences by lazy {
@@ -57,11 +61,31 @@ object PrefManager   {
     val isStarted : Boolean
         get() = pref.getBoolean(START, false)
 
-    val getLat : Double
-        get() = pref.getFloat(LATITUDE, 40.7128F).toDouble()
+    /**
+     * Coordinates are stored as the raw bits of a Double.
+     *
+     * They used to be Floats, which carry about seven significant digits — at
+     * longitude 100 that leaves roughly a metre of resolution. The joystick
+     * moves in sub-metre steps and the jitter walk in smaller ones still, so
+     * individual steps were being swallowed by rounding. SharedPreferences has
+     * no putDouble, hence the bit round-trip.
+     */
+    val getLat: Double
+        get() = readCoordinate(LATITUDE, LATITUDE_FLOAT, DEFAULT_LAT)
 
-    val getLng : Double
-        get() = pref.getFloat(LONGITUDE, -74.0060F).toDouble()
+    val getLng: Double
+        get() = readCoordinate(LONGITUDE, LONGITUDE_FLOAT, DEFAULT_LNG)
+
+    private fun readCoordinate(key: String, legacyKey: String, fallback: Double): Double {
+        if (pref.contains(key)) {
+            return Double.fromBits(pref.getLong(key, fallback.toRawBits()))
+        }
+        // Values written by an older build.
+        if (pref.contains(legacyKey)) {
+            return pref.getFloat(legacyKey, fallback.toFloat()).toDouble()
+        }
+        return fallback
+    }
 
     var accuracy : String?
         get() = pref.getString(ACCURACY_SETTING,"10")
@@ -127,6 +151,11 @@ object PrefManager   {
         get() = pref.getString(TILE_PROXY_PORT, "33009")
         set(value) { pref.edit().putString(TILE_PROXY_PORT, value).apply() }
 
+    /** Joystick travel speed in metres per second at full deflection. */
+    var joystickSpeed: String?
+        get() = pref.getString(JOYSTICK_SPEED, "8")
+        set(value) { pref.edit().putString(JOYSTICK_SPEED, value).apply() }
+
     /** Serve tiles from the cache only; nothing is fetched. */
     var offlineMap: Boolean
         get() = pref.getBoolean(OFFLINE_MAP, false)
@@ -134,16 +163,18 @@ object PrefManager   {
 
 
 
-    fun update(start:Boolean, la: Double, ln: Double) {
+    fun update(start: Boolean, la: Double, ln: Double) {
         runInBackground {
-            val prefEditor = pref.edit()
-            prefEditor.putFloat(LATITUDE, la.toFloat())
-            prefEditor.putFloat(LONGITUDE, ln.toFloat())
-            prefEditor.putBoolean(START, start)
-            prefEditor.apply()
+            pref.edit()
+                .putLong(LATITUDE, la.toRawBits())
+                .putLong(LONGITUDE, ln.toRawBits())
+                .putBoolean(START, start)
+                .apply()
         }
-
     }
+
+    private const val DEFAULT_LAT = 40.7128
+    private const val DEFAULT_LNG = -74.0060
 
 
 

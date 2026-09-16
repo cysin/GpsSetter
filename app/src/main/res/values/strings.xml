@@ -109,4 +109,7 @@
     <string name="tile_proxy_port">Proxy port</string>
     <string name="map_category">Map</string>
 
+    <string name="joystick_speed">Joystick speed</string>
+    <string name="joystick_speed_summary">Metres per second at full deflection</string>
+    <string name="joystick_readout">%1$.5f, %2$.5f  ·  %3$d m/s</string>
 </resources>

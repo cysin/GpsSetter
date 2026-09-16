@@ -13,6 +13,13 @@
             android:summary="%s"
             android:title="@string/dark_theme" />
 
+        <EditTextPreference
+            android:defaultValue="8"
+            android:digits="0123456789"
+            android:key="joystick_speed"
+            android:summary="@string/joystick_speed_summary"
+            android:title="@string/joystick_speed" />
+
         <Preference
             android:title="Add Joystick"
             android:key="isJoyStickEnable"

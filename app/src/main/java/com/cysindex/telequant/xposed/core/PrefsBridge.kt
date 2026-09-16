@@ -16,8 +16,11 @@ import de.robv.android.xposed.XSharedPreferences
 object PrefsBridge {
 
     const val KEY_STARTED = "start"
-    const val KEY_LAT = "latitude"
-    const val KEY_LNG = "longitude"
+    // Double stored as raw bits; the *_FLOAT keys are what older builds wrote.
+    const val KEY_LAT = "latitude_d"
+    const val KEY_LNG = "longitude_d"
+    const val KEY_LAT_FLOAT = "latitude"
+    const val KEY_LNG_FLOAT = "longitude"
     const val KEY_ACCURACY = "accuracy_settings"
     const val KEY_JITTER_RADIUS = "jitter_radius"
     const val KEY_JITTER_MODE = "jitter_mode"
@@ -43,9 +46,17 @@ object PrefsBridge {
 
     val isStarted: Boolean get() = prefs().getBoolean(KEY_STARTED, false)
 
-    val anchorLat: Double get() = prefs().getFloat(KEY_LAT, DEFAULT_LAT).toDouble()
+    val anchorLat: Double get() = readCoordinate(KEY_LAT, KEY_LAT_FLOAT, DEFAULT_LAT)
 
-    val anchorLng: Double get() = prefs().getFloat(KEY_LNG, DEFAULT_LNG).toDouble()
+    val anchorLng: Double get() = readCoordinate(KEY_LNG, KEY_LNG_FLOAT, DEFAULT_LNG)
+
+    /** Float storage cost about a metre of resolution; see PrefManager. */
+    private fun readCoordinate(key: String, legacyKey: String, fallback: Double): Double {
+        val p = prefs()
+        if (p.contains(key)) return Double.fromBits(p.getLong(key, fallback.toRawBits()))
+        if (p.contains(legacyKey)) return p.getFloat(legacyKey, fallback.toFloat()).toDouble()
+        return fallback
+    }
 
     val accuracy: Float
         get() = prefs().getString(KEY_ACCURACY, "10")?.toFloatOrNull() ?: 10f
@@ -73,6 +84,6 @@ object PrefsBridge {
         return cachedEnvironment
     }
 
-    private const val DEFAULT_LAT = 40.7128f
-    private const val DEFAULT_LNG = -74.0060f
+    private const val DEFAULT_LAT = 40.7128
+    private const val DEFAULT_LNG = -74.0060
 }

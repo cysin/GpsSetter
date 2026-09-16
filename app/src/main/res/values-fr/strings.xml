@@ -100,4 +100,7 @@
     <string name="tile_proxy_host">Hôte du proxy</string>
     <string name="tile_proxy_port">Port du proxy</string>
     <string name="map_category">Carte</string>
+    <string name="joystick_speed">Vitesse du joystick</string>
+    <string name="joystick_speed_summary">Mètres par seconde à pleine amplitude</string>
+    <string name="joystick_readout">%1$.5f, %2$.5f  ·  %3$d m/s</string>
 </resources>

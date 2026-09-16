@@ -63,6 +63,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
+import org.osmdroid.views.overlay.Polygon
 import java.io.IOException
 import java.util.regex.Matcher
 import java.util.regex.Pattern
@@ -78,6 +79,7 @@ class MapActivity : AppCompatActivity() {
     private var favListAdapter: FavListAdapter = FavListAdapter()
     private var mMarker: Marker? = null
     private var mGeoPoint: GeoPoint? = null
+    private var jitterCircle: Polygon? = null
     private var lat by Delegates.notNull<Double>()
     private var lon by Delegates.notNull<Double>()
     private var xposedDialog: AlertDialog? = null
@@ -299,12 +301,14 @@ class MapActivity : AppCompatActivity() {
             title = markerTitle(mGeoPoint)
         }
 
+        // Long press rather than tap: a single tap is indistinguishable from the
+        // start of a pan, so tapping to place the target meant constantly moving
+        // it by accident while navigating the map.
         map.overlays.add(object : Overlay() {
-            override fun onSingleTapConfirmed(e: MotionEvent?, mapView: MapView?): Boolean {
-                if (e != null && mapView != null) {
-                    val geoPoint = mapView.projection.fromPixels(e.x.toInt(), e.y.toInt())
-                    onMapClick(GeoPoint(geoPoint.latitude, geoPoint.longitude))
-                }
+            override fun onLongPress(e: MotionEvent?, mapView: MapView?): Boolean {
+                if (e == null || mapView == null) return false
+                val geoPoint = mapView.projection.fromPixels(e.x.toInt(), e.y.toInt())
+                onMapClick(GeoPoint(geoPoint.latitude, geoPoint.longitude))
                 return true
             }
         })
@@ -312,6 +316,7 @@ class MapActivity : AppCompatActivity() {
         if (viewModel.isStarted) {
             map.overlays.add(mMarker)
         }
+        updateJitterCircle()
         map.invalidate()
     }
 
@@ -344,8 +349,35 @@ class MapActivity : AppCompatActivity() {
             map.controller.animateTo(geoPoint)
             lat = geoPoint.latitude
             lon = geoPoint.longitude
+            updateJitterCircle()
             map.invalidate()
         }
+    }
+
+    /**
+     * Draws the jitter radius so the wander area is visible. Without it the
+     * reported position drifting away from the pin looks like a bug.
+     */
+    private fun updateJitterCircle() {
+        jitterCircle?.let { map.overlays.remove(it) }
+        jitterCircle = null
+
+        val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
+        val centre = mGeoPoint ?: return
+        if (radius <= 0.0) return
+
+        val outline = MaterialColors.getColor(
+            binding.root, androidx.appcompat.R.attr.colorPrimary
+        )
+        jitterCircle = Polygon(map).apply {
+            points = Polygon.pointsAsCircle(centre, radius)
+            fillPaint.color = ColorUtils.setAlphaComponent(outline, 40)
+            outlinePaint.color = ColorUtils.setAlphaComponent(outline, 160)
+            outlinePaint.strokeWidth = 3f
+            setOnClickListener { _, _, _ -> false }
+        }
+        // Below the marker so the pin stays tappable.
+        map.overlays.add(0, jitterCircle)
     }
 
     private fun moveMapToNewLocation(moveNewLocation: Boolean) {
@@ -367,6 +399,9 @@ class MapActivity : AppCompatActivity() {
         super.onResume()
         map.onResume()
         viewModel.updateXposedState()
+        // The radius may have been changed in settings while we were away.
+        updateJitterCircle()
+        map.invalidate()
     }
 
     override fun onPause() {

@@ -75,6 +75,7 @@ class SettingsActivity : AppCompatActivity() {
                 "jitter_mode" -> PrefManager.jitterMode
                 "tile_proxy_host" -> PrefManager.tileProxyHost
                 "tile_proxy_port" -> PrefManager.tileProxyPort
+                "joystick_speed" -> PrefManager.joystickSpeed
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
@@ -87,6 +88,7 @@ class SettingsActivity : AppCompatActivity() {
                 "jitter_mode" -> PrefManager.jitterMode = value
                 "tile_proxy_host" -> PrefManager.tileProxyHost = value
                 "tile_proxy_port" -> PrefManager.tileProxyPort = value
+                "joystick_speed" -> PrefManager.joystickSpeed = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
         }
