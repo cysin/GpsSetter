@@ -566,8 +566,15 @@ class MapActivity : AppCompatActivity() {
         alertDialog.setTitle(getString(R.string.favourites))
         val view = layoutInflater.inflate(R.layout.fav, null)
         val rcv = view.findViewById<RecyclerView>(R.id.favorites_list)
+        val empty = view.findViewById<TextView>(R.id.favorites_empty)
         rcv.layoutManager = LinearLayoutManager(this)
         rcv.adapter = favListAdapter
+        // Tells "nothing saved yet" apart from "failed to load"; without it an
+        // empty list is just blank space.
+        favListAdapter.onListChanged = { count ->
+            empty.visibility = if (count == 0) View.VISIBLE else View.GONE
+            rcv.visibility = if (count == 0) View.GONE else View.VISIBLE
+        }
         favListAdapter.onItemClick = { favourite ->
             val favLat = favourite.lat
             val favLon = favourite.lng

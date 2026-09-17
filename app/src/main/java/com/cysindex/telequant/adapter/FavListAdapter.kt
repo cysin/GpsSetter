@@ -16,6 +16,15 @@ class FavListAdapter(
 
     var onItemClick : ((Favourite) -> Unit)? = null
     var onItemDelete : ((Favourite) -> Unit)? = null
+    var onListChanged : ((Int) -> Unit)? = null
+
+    override fun onCurrentListChanged(
+        previousList: MutableList<Favourite>,
+        currentList: MutableList<Favourite>
+    ) {
+        super.onCurrentListChanged(previousList, currentList)
+        onListChanged?.invoke(currentList.size)
+    }
 
    inner class ViewHolder(view: View): RecyclerView.ViewHolder(view) {
 

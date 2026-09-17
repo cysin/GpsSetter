@@ -93,4 +93,5 @@
     <string name="address_looking_up">Recherche de l\'adresse…</string>
     <string name="jitter_radius_fixed">Fixe — la position ne bouge jamais</string>
     <string name="jitter_radius_value">Varie jusqu\'à %1$d m autour du point</string>
+    <string name="favourites_empty">Aucun lieu enregistré.\nAppuyez sur l\'étoile pour en ajouter un.</string>
 </resources>

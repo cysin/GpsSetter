@@ -1,16 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<!--
+    A fixed minimum height so an empty list still reads as a list rather than
+    collapsing the dialog to a title bar, and an empty-state label so "nothing
+    saved yet" is distinguishable from "failed to load".
+-->
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
+    android:layout_height="wrap_content"
+    android:minHeight="160dp">
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/favorites_list"
-        android:layout_marginTop="8dp"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:dividerHeight="2dp"/>
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:maxHeight="420dp" />
 
-</LinearLayout>
+    <TextView
+        android:id="@+id/favorites_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="24dp"
+        android:text="@string/favourites_empty"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+</FrameLayout>
