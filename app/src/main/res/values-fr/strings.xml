@@ -91,4 +91,6 @@
     <string name="offline_mode">Hors ligne uniquement</string>
     <string name="offline_mode_summary">Utiliser les zones téléchargées, sans jamais récupérer de tuiles</string>
     <string name="address_looking_up">Recherche de l\'adresse…</string>
+    <string name="jitter_radius_fixed">Fixe — la position ne bouge jamais</string>
+    <string name="jitter_radius_value">Varie jusqu\'à %1$d m autour du point</string>
 </resources>

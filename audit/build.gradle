@@ -1,0 +1,45 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.devtools.ksp'
+}
+
+/*
+ * A separate APK on purpose. The module hooks with loadApp(isExcludeSelf = true)
+ * and must keep doing so — the module app needs the device's real position to
+ * record an environment. That exclusion means an auditor living inside the
+ * module's own package could never be hooked, and would report real values no
+ * matter what. Under its own package name it can be added to the module's scope
+ * like any other target.
+ */
+android {
+    namespace 'com.cysindex.telequant.audit'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "com.cysindex.telequant.audit"
+        minSdk 30
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.19.0'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+}

@@ -429,14 +429,23 @@ class MapActivity : AppCompatActivity() {
      * there.
      */
     private fun search(input: String) {
-        COORDINATE.matcher(input).takeIf { it.matches() }?.let { matcher ->
-            val parts = matcher.group().split(",")
-            val parsedLat = parts[0].trim().toDoubleOrNull()
-            val parsedLon = parts[1].trim().toDoubleOrNull()
-            if (parsedLat != null && parsedLon != null) {
+        val normalized = normalizeInput(input)
+        val matcher = COORDINATE.matcher(normalized)
+        if (matcher.matches()) {
+            // Capture groups rather than splitting the whole match, so the
+            // separator can be a comma or plain whitespace.
+            val parsedLat = matcher.group(1)?.toDoubleOrNull()
+            val parsedLon = matcher.group(2)?.toDoubleOrNull()
+            if (parsedLat != null && parsedLon != null &&
+                parsedLat in -90.0..90.0 && parsedLon in -180.0..180.0
+            ) {
                 moveTarget(parsedLat, parsedLon, recentre = true)
                 return
             }
+            // Numeric but out of range — say so rather than sending digits to a
+            // place-name lookup that will unhelpfully report "not found".
+            showToast(getString(R.string.enter_valid_input))
+            return
         }
 
         if (!isNetworkConnected()) {
@@ -445,7 +454,7 @@ class MapActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            val results = Nominatim.search(input)
+            val results = Nominatim.search(normalized)
             when {
                 results.isEmpty() -> showToast(getString(R.string.address_not_found))
                 results.size == 1 -> results[0].let {
@@ -810,7 +819,37 @@ class MapActivity : AppCompatActivity() {
         const val CIRCLE_SEGMENTS = 64
         const val EARTH_RADIUS_M = 6378137.0
 
+        /**
+         * Separator is a comma or just whitespace, because a coordinate typed on
+         * a Chinese IME arrives with a full-width comma and the pair is often
+         * pasted space-separated.
+         */
         val COORDINATE: Pattern =
-            Pattern.compile("[-+]?\\d{1,3}([.]\\d+)?, *[-+]?\\d{1,3}([.]\\d+)?")
+            Pattern.compile("([-+]?\\d{1,3}(?:[.]\\d+)?)\\s*[,\\s]\\s*([-+]?\\d{1,3}(?:[.]\\d+)?)")
+
+        /**
+         * Folds the full-width forms a Chinese keyboard produces onto ASCII.
+         *
+         * Without this, typing coordinates on a Chinese IME yields "，" instead
+         * of ",", the pattern does not match, and the input silently falls
+         * through to a place-name lookup that reports "address not found" — the
+         * failure looks like a network problem rather than a parsing one.
+         */
+        fun normalizeInput(raw: String): String = buildString {
+            raw.trim().forEach { c ->
+                append(
+                    when (c) {
+                        '，', '、' -> ','
+                        '．', '。' -> '.'
+                        '　' -> ' '
+                        '－', '−' -> '-'
+                        '＋' -> '+'
+                        // Full-width digits 0-9
+                        in '０'..'９' -> '0' + (c - '０')
+                        else -> c
+                    }
+                )
+            }
+        }
     }
 }

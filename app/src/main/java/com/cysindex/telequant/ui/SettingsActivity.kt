@@ -141,25 +141,35 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<EditTextPreference>("accuracy_settings")?.let {
                 it.summary = "${PrefManager.accuracy} m."
                 it.setOnBindEditTextListener { editText ->
-                    editText.inputType = InputType.TYPE_CLASS_NUMBER;
-                    editText.keyListener = DigitsKeyListener.getInstance("0123456789.,");
-                    editText.addTextChangedListener(getCommaReplacerTextWatcher(editText));
+                    editText.inputType = InputType.TYPE_CLASS_NUMBER
+                    editText.keyListener = DigitsKeyListener.getInstance("0123456789.,")
+                    editText.addTextChangedListener(getCommaReplacerTextWatcher(editText))
                 }
-
                 it.setOnPreferenceChangeListener { preference, newValue ->
-                    try {
-                        newValue as String?
-                        preference.summary = "$newValue  m."
-                    } catch (n: NumberFormatException) {
-                        n.printStackTrace()
-                        Toast.makeText(
-                            requireContext(),
-                            getString(R.string.enter_valid_input),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                    preference.summary = "$newValue m."
                     true
                 }
+            }
+
+            findPreference<EditTextPreference>("jitter_radius")?.let {
+                it.summary = radiusSummary(PrefManager.jitterRadius)
+                it.setOnBindEditTextListener { editText ->
+                    editText.inputType = InputType.TYPE_CLASS_NUMBER
+                }
+                it.setOnPreferenceChangeListener { preference, newValue ->
+                    preference.summary = radiusSummary(newValue as? String)
+                    true
+                }
+            }
+
+            /*
+             * "%s" in android:summary is only substituted for ListPreference and
+             * its subclasses. On an EditTextPreference it renders literally, so
+             * the proxy rows showed the characters "%s" rather than the value.
+             */
+            listOf("tile_proxy_host", "tile_proxy_port").forEach { key ->
+                findPreference<EditTextPreference>(key)?.summaryProvider =
+                    EditTextPreference.SimpleSummaryProvider.getInstance()
             }
 
             findPreference<SimpleMenuPreference>("darkTheme")?.setOnPreferenceChangeListener { _, newValue ->
@@ -169,6 +179,16 @@ class SettingsActivity : AppCompatActivity() {
                     activity?.recreate()
                 }
                 true
+            }
+        }
+
+        /** 0 is a meaningful setting here, so it gets its own wording. */
+        private fun radiusSummary(value: String?): String {
+            val metres = value?.toDoubleOrNull() ?: 0.0
+            return if (metres <= 0.0) {
+                getString(R.string.jitter_radius_fixed)
+            } else {
+                getString(R.string.jitter_radius_value, metres.toInt())
             }
         }
 

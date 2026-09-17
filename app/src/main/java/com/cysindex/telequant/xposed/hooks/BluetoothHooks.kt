@@ -4,7 +4,9 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.SystemClock
 import com.cysindex.telequant.spoof.BeaconRecord
 import com.cysindex.telequant.xposed.core.SpoofEngine
@@ -32,6 +34,7 @@ object BluetoothHooks : YukiBaseHooker() {
         hookLeScanner()
         hookDiscovery()
         hookFoundBroadcast()
+        hookDeviceIdentity()
     }
 
     private fun snapshot(): SpoofEngine.Snapshot? =
@@ -146,15 +149,37 @@ object BluetoothHooks : YukiBaseHooker() {
     }
 
     /**
-     * Unlike Wi-Fi, where the broadcast is only a trigger and the data is
-     * fetched afterwards, classic Bluetooth carries the device and its RSSI
-     * directly in the ACTION_FOUND intent. Leaving it alone would hand the app
-     * the real surrounding devices even with every scan API hooked.
+     * Rewrites the ACTION_FOUND broadcast, which carries the discovered device
+     * and its RSSI in the intent itself — unlike Wi-Fi, where the broadcast is
+     * only a trigger and the data is fetched afterwards through an API that is
+     * already hooked.
+     *
+     * `BroadcastReceiver.onReceive` cannot be hooked directly: it is an abstract
+     * method on an abstract class, so there is no body to replace and LSPlant
+     * rejects it ("Try to hook ... got an exception"). Instead each receiver is
+     * caught as it registers and its concrete subclass is hooked, which does
+     * have an implementation.
      */
     private fun hookFoundBroadcast() {
-        "android.content.BroadcastReceiver".toClass().apply {
-            if (!hasMethod { name = "onReceive" }) return@apply
-            method { name = "onReceive" }.hookAll {
+        "android.content.ContextWrapper".toClass().apply {
+            if (!hasMethod { name = "registerReceiver" }) return@apply
+            method { name = "registerReceiver" }.hookAll {
+                before {
+                    val receiver = args.firstOrNull { it is BroadcastReceiver } ?: return@before
+                    val filter = args.firstOrNull { it is IntentFilter } as? IntentFilter
+                    // Only receivers that actually asked for device discovery.
+                    if (filter?.hasAction(BluetoothDevice.ACTION_FOUND) != true) return@before
+                    hookReceiverClass(receiver.javaClass)
+                }
+            }
+        }
+    }
+
+    /** Hooks one concrete receiver class, once. */
+    private fun hookReceiverClass(clazz: Class<*>) {
+        if (!hookedReceivers.add(clazz.name)) return
+        runCatching {
+            clazz.method { name = "onReceive" }.hookAll {
                 before {
                     val snapshot = snapshot() ?: return@before
                     if (!snapshot.hasBeacons) return@before
@@ -171,7 +196,12 @@ object BluetoothHooks : YukiBaseHooker() {
                     }
                 }
             }
-        }
+        }.onFailure { YLog.debug("receiver hook skipped for ${clazz.name}: $it") }
+    }
+
+    private val hookedReceivers = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    private fun hookDeviceIdentity() {
 
         // Device identity, for code holding a BluetoothDevice directly.
         "android.bluetooth.BluetoothDevice".toClass().apply {

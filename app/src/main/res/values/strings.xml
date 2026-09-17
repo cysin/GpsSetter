@@ -91,4 +91,6 @@
     <string name="offline_mode">Offline only</string>
     <string name="offline_mode_summary">Draw from downloaded regions and never fetch tiles</string>
     <string name="address_looking_up">Looking up address…</string>
+    <string name="jitter_radius_fixed">Fixed — the position never moves</string>
+    <string name="jitter_radius_value">Wanders up to %1$d m from the anchor</string>
 </resources>

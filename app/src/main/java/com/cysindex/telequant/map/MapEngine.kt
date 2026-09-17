@@ -40,9 +40,20 @@ object MapEngine {
     @Synchronized
     fun init(context: Context) {
         if (initialised) return
-        applyHttpStack()
+
+        // Order matters and is not obvious. HttpRequestUtil.setOkHttpClient
+        // reaches HttpRequestImpl, whose static initialiser calls
+        // MapLibre.getApplicationContext() and throws
+        // MapLibreConfigurationException if getInstance() has not run yet.
+        //
+        // Getting this backwards is unrecoverable rather than merely wrong: a
+        // class whose <clinit> throws is marked erroneous for the life of the
+        // process, so every later HTTP request fails inside JNI and aborts with
+        // "uncaught exception of type jni::PendingJavaException".
         MapLibre.getInstance(context.applicationContext)
         initialised = true
+
+        applyHttpStack()
         applyConnectivity()
     }
 

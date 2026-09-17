@@ -1,0 +1,8 @@
+com.cysindex.telequant.audit-pngs-0 /home/star/work/GpsSetter/audit/build/generated/res/pngs/release
+com.cysindex.telequant.audit-updated_navigation_xml-1 /home/star/work/GpsSetter/audit/build/generated/updated_navigation_xml/release
+com.cysindex.telequant.audit-packageReleaseResources-2 /home/star/work/GpsSetter/audit/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+com.cysindex.telequant.audit-packageReleaseResources-3 /home/star/work/GpsSetter/audit/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+com.cysindex.telequant.audit-release-4 /home/star/work/GpsSetter/audit/build/intermediates/merged_res/release/mergeReleaseResources
+com.cysindex.telequant.audit-main-5 /home/star/work/GpsSetter/audit/src/main/res
+com.cysindex.telequant.audit-release-6 /home/star/work/GpsSetter/audit/src/release/res
+gradleHome-0 /home/star/.gradle

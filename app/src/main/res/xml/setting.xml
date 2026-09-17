@@ -34,7 +34,7 @@
             android:key="jitter_radius"
             android:title="@string/jitter_radius"
             android:icon="@drawable/ic_random_position"
-            android:summary="@string/jitter_radius_summary" />
+             />
 
         <rikka.preference.SimpleMenuPreference
             android:defaultValue="STATIONARY"
