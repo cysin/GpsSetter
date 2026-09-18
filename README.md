@@ -8,10 +8,16 @@ consistent with one another.
 Forked from [Android1500/GpsSetter](https://github.com/Android1500/GpsSetter),
 then largely rewritten. Package renamed to `com.cysindex.telequant`.
 
-> **Runtime behaviour is not verified.** Everything here compiles, passes lint,
-> and produces an APK whose Xposed entry point is correctly generated. None of
-> the hooks have been exercised on a device. Treat the hook layer as untested
-> until it has been through the audit procedure below.
+> **Verified on a device** (OnePlus CPH2645, Android 16, Vector) through the
+> audit procedure below, with the synthetic profile loaded: position on all
+> three providers, cell list and operator identity on both the pull and push
+> paths, `ServiceState`, Wi-Fi scan and `NetworkCapabilities.getTransportInfo`,
+> BLE scan, and the tile proxy and offline store. Three third-party map apps
+> resolve to the spoofed position.
+>
+> What that does *not* cover: the GNSS callbacks and NMEA, proximity alerts,
+> Wi-Fi RTT, and dual-SIM `SubscriptionInfo` — those compile and are hooked but
+> have not been watched returning a spoofed value on hardware.
 
 ---
 
@@ -47,9 +53,15 @@ app/src/main/java/com/cysindex/telequant/
 │   └── hooks/                  one file per signal family
 ├── record/EnvironmentRecorder.kt   captures a place's radio environment
 ├── map/                        MapLibre setup, offline regions, Nominatim
-├── ui/, room/, utils/          the module app itself
-└── debug/SignalAuditActivity.kt    debug-only coverage checker
+└── ui/, room/, utils/          the module app itself
+
+audit/                        a SEPARATE APK: com.cysindex.telequant.audit
+└── SignalAuditActivity.kt      coverage checker, one row per hooked path
 ```
+
+The auditor is its own application rather than a screen inside the module,
+because the hook entry calls `loadApp(isExcludeSelf = true)` — the module never
+hooks itself, so a self-audit would only ever read real values.
 
 ### The invariant
 
@@ -93,19 +105,31 @@ and pass through the CREATOR hook.
 
 ### Tier B — radio environment
 
-**Cell** — `getAllCellInfo` (via the identity getters), `getCellLocation`,
-`PhoneStateListener` / `registerTelephonyCallback`, all `CellIdentity*` and
-`CellSignalStrength*` getters, `ServiceState`, `SubscriptionInfo`, and the
-operator strings so they agree with the spoofed MCC/MNC.
+**Cell** — `getAllCellInfo` returns a list **built from the recording**, one
+`CellInfo` per recorded cell, each bound to its own record: a list where every
+tower reports the same identity is not a state a radio produces, and a recording
+of five towers must surface five. The push path is hooked alongside it —
+`listen()`, `registerTelephonyCallback()` (API 31+) and `requestCellInfoUpdate()`
+— since covering only the pull leaves the modern path delivering the real
+neighbour set. Plus `getCellLocation`, all `CellIdentity*` and
+`CellSignalStrength*` getters, `ServiceState` (registration, roaming, registered
+PLMN), `SubscriptionInfo`, and the operator strings so they agree with the
+spoofed MCC/MNC.
 
 **Wi-Fi** — `getScanResults`, `getConnectionInfo`, `WifiInfo` getters including
 `getWifiSsid` (API 33+), **`NetworkCapabilities.getTransportInfo()`** (the API
 31+ path that bypasses `WifiManager` entirely), and `WifiRttManager` (suppressed).
 
-**Bluetooth** — `BluetoothLeScanner.startScan` callbacks, classic discovery, and
+**Bluetooth** — `BluetoothLeScanner.startScan` callbacks, `stopScan` (which
+must be translated back to the substituted callback, or the scan never stops),
+the `PendingIntent` overload via the scan-result extra, classic discovery, and
 the `ACTION_FOUND` broadcast. Unlike Wi-Fi, where the broadcast is only a
 trigger and data is fetched afterwards, ACTION_FOUND carries the device and RSSI
 in the intent itself, so it must be rewritten rather than passed through.
+
+Beacons are delivered **on a timer**, not by rewriting genuine results as they
+arrive: a result only arrives when something real is advertising nearby, so an
+app scanning a quiet room would otherwise conclude there are no beacons.
 
 **GNSS** — `registerGnssStatusCallback` (satellites regenerated per callback
 with C/N0 drift), `addNmeaListener` (sentences synthesised — NMEA carries the
@@ -130,14 +154,19 @@ network type vs cell type, Wi-Fi absent-value semantics (`"<unknown ssid>"`, not
 
 ### Known gaps
 
-- Cell and Wi-Fi objects are **rewritten in place** rather than constructed.
-  When the real list is empty (no service, Wi-Fi off) there is nothing to
-  rewrite and that signal passes through. This is a deliberate trade for
-  cross-version robustness: building `CellInfo` means hidden constructors whose
-  signatures differ across API levels and OEM forks.
+- Cell and Wi-Fi objects are **cloned from a real one of the same type** where
+  the device reports one, because a clone keeps every field this module does not
+  set at whatever the platform put there. Only when there is nothing of that
+  type to copy — no service, Wi-Fi off, a radio the device does not have — is one
+  built through a hidden constructor. That path is the less robust of the two:
+  the signatures differ across API levels and OEM forks, and a type that cannot
+  be constructed is dropped from the list with a warning rather than faked as
+  some other type.
 - With no recorded environment, cell/Wi-Fi/Bluetooth are not spoofed at all —
   only the GPS path works. Satellites are synthesised.
 - Bonded Bluetooth devices are reported as an empty set.
+- `BluetoothDevice.getName()` returns null for any address the recording does
+  not contain, rather than the device's real name.
 
 ---
 
@@ -195,20 +224,33 @@ to ship an update** — Android refuses an update signed with a different key.
 Compile checks catch very little here; almost every failure mode is a hook that
 silently does nothing.
 
-1. `./gradlew assembleDebug lintDebug` — lint must stay at zero errors.
-2. Confirm `assets/xposed_init` is present in the APK (above).
-3. Install the **debug** variant, add it to the module's own Xposed scope, and
-   run the coverage checker:
+1. `./gradlew testDebugUnitTest` — the jitter walk, the GCJ-02 transform, the
+   environment's JSON round trip and the synthetic profile are covered without a
+   device. Seeds are fixed, so a failure reproduces.
+2. `./gradlew assembleDebug lintDebug` — lint must stay at zero errors.
+3. Confirm `assets/xposed_init` is present in the APK (above).
+4. Install the auditor, add **it** to the module's Xposed scope (not the module),
+   and run it:
    ```
-   adb shell am start -n com.cysindex.telequant/.debug.SignalAuditActivity
+   ./gradlew :audit:assembleDebug
+   adb install -r audit/build/outputs/apk/debug/audit-debug.apk
+   adb shell am start -n com.cysindex.telequant.audit/.SignalAuditActivity
    ```
    It calls every covered path and prints what came back, so a path still
    returning real data is visible at a glance. It prints `getLastKnownLocation`
    through both the getter and `toString()`, since those disagreeing is exactly
    the class of bug it exists to catch.
-4. Cross-check with third-party diagnostics — Network Cell Info, GPSTest,
+5. **Load the synthetic profile first** (drawer → *Load test environment*).
+   Auditing against a recording made on the same phone proves nothing: the
+   recording holds that phone's real towers, so a hooked read and an unhooked
+   one return the same values. The synthetic profile cannot be confused with
+   the device's own.
+6. After reinstalling the module, wait for Vector to rescan before launching a
+   target app. An app started during the replacement loads with no hooks at all
+   and every reading comes back real, which looks exactly like a broken hook.
+7. Cross-check with third-party diagnostics — Network Cell Info, GPSTest,
    nRF Connect — because the audit page can be wrong too.
-5. Leave it running for five minutes: the track should be a continuous wander
+8. Leave it running for five minutes: the track should be a continuous wander
    inside the radius with no teleporting, and RSSI/C-N0 should fluctuate rather
    than sit still.
 
