@@ -1,51 +1,97 @@
 package com.cysindex.telequant.spoof
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.hypot
 import kotlin.random.Random
 
 /**
- * The jitter walk is the one piece of the module whose output is random, which
- * makes it the easiest place for a change to look fine and be wrong. Every test
- * here fixes the seed so a failure is reproducible.
+ * The walk is a pure function of the clock, so these are exact expectations
+ * rather than statistical ones.
  */
 class JitterEngineTest {
 
-    private val second = 1_000_000_000L
+    private val start = 1_700_000_000_000L
 
-    private fun walk(
+    private fun path(
         radius: Double,
         mode: JitterEngine.Mode,
-        steps: Int = 2_000,
-        stepNanos: Long = second / 5,
-        seed: Int = 42
-    ): List<JitterEngine.Sample> {
-        val engine = JitterEngine(radius, mode, Random(seed))
-        var now = second
-        return (0 until steps).map {
-            now += stepNanos
-            engine.sample(now)
-        }
-    }
+        steps: Int = 4_000,
+        stepMillis: Long = 200L
+    ): List<JitterEngine.Sample> =
+        (0 until steps).map { JitterEngine.sample(radius, mode, start + it * stepMillis) }
 
     @Test
     fun `stays inside the radius`() {
         JitterEngine.Mode.entries.forEach { mode ->
-            walk(radius = 10.0, mode = mode).forEachIndexed { i, sample ->
+            path(radius = 10.0, mode = mode).forEachIndexed { i, sample ->
                 val distance = hypot(sample.dEastMeters, sample.dNorthMeters)
                 assertTrue(
-                    "$mode escaped the radius at step $i: ${"%.2f".format(distance)}m > 10m",
-                    distance <= 10.0 + 1e-6
+                    "$mode escaped at step $i: ${"%.3f".format(distance)}m > 10m",
+                    distance <= 10.0 + 1e-9
                 )
             }
         }
     }
 
     @Test
+    fun `stays inside the radius however coarsely it is sampled`() {
+        // The previous implementation reflected off the boundary, which only
+        // held while a step was shorter than two radii. Sampling once every ten
+        // minutes in driving mode is the case that broke it.
+        (0 until 500).forEach { i ->
+            val sample = JitterEngine.sample(
+                3.0, JitterEngine.Mode.DRIVING, start + i * 600_000L
+            )
+            assertTrue(
+                "escaped: ${"%.3f".format(hypot(sample.dEastMeters, sample.dNorthMeters))}m",
+                hypot(sample.dEastMeters, sample.dNorthMeters) <= 3.0 + 1e-9
+            )
+        }
+    }
+
+    @Test
+    fun `every caller at the same instant gets the same point`() {
+        // The property the whole design exists for: the module runs separately
+        // inside every hooked app, and two apps asking where the device is at
+        // the same moment must not get answers metres apart.
+        val instant = start + 12_345
+        val first = JitterEngine.sample(10.0, JitterEngine.Mode.WALKING, instant)
+        val second = JitterEngine.sample(10.0, JitterEngine.Mode.WALKING, instant)
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun `a caller joining late lands on the path, not at the centre`() {
+        // Every app used to begin its walk at the exact centre of the circle,
+        // so a freshly launched app announced itself by sitting on the anchor.
+        val late = JitterEngine.sample(10.0, JitterEngine.Mode.WALKING, start + 3_600_000)
+        assertTrue(hypot(late.dEastMeters, late.dNorthMeters) > 0.5)
+    }
+
+    @Test
+    fun `starting at different moments starts at different points`() {
+        // Pressing Start must not drop the fix on the anchor. The walk this
+        // replaced accumulated its offset from zero, so every process — and so
+        // every app, at every launch — began at the exact centre of the circle.
+        val radius = 10.0
+        val starts = (0 until 400).map { start + it * 7_919L }
+        val offsets = starts.map { JitterEngine.sample(radius, JitterEngine.Mode.WALKING, it) }
+            .map { hypot(it.dEastMeters, it.dNorthMeters) }
+
+        assertTrue("start points are all alike", offsets.distinct().size > 350)
+        // Spread through the circle rather than hugging either the centre or
+        // the rim.
+        val mean = offsets.average()
+        assertTrue("mean start offset ${"%.2f".format(mean)}m", mean in 2.0..8.0)
+        assertTrue("too many start on the anchor", offsets.count { it < 0.5 } < 20)
+    }
+
+    @Test
     fun `a radius of zero does not move`() {
-        walk(radius = 0.0, mode = JitterEngine.Mode.WALKING).forEach {
+        path(radius = 0.0, mode = JitterEngine.Mode.WALKING, steps = 100).forEach {
             assertEquals(0.0, it.dEastMeters, 0.0)
             assertEquals(0.0, it.dNorthMeters, 0.0)
             assertEquals(0f, it.speedMps, 0.0f)
@@ -53,24 +99,11 @@ class JitterEngineTest {
     }
 
     @Test
-    fun `the first sample sits on the anchor`() {
-        // Until there is a previous sample there is no interval to move over,
-        // and a fix that starts somewhere other than the chosen point is simply
-        // the wrong place.
-        val first = JitterEngine(10.0, JitterEngine.Mode.WALKING, Random(1)).sample(second)
-        assertEquals(0.0, first.dEastMeters, 0.0)
-        assertEquals(0.0, first.dNorthMeters, 0.0)
-    }
-
-    @Test
     fun `successive samples do not teleport`() {
-        // The point of a correlated walk: consecutive positions have to be close
-        // enough that the implied speed is physically possible. An independent
-        // draw per call would pass every other test here and fail this one.
-        val stepNanos = second / 5
-        val dt = stepNanos / 1_000_000_000.0
+        val stepMillis = 200L
+        val dt = stepMillis / 1000.0
         var previous: JitterEngine.Sample? = null
-        walk(radius = 20.0, mode = JitterEngine.Mode.WALKING, stepNanos = stepNanos).forEach { s ->
+        path(radius = 20.0, mode = JitterEngine.Mode.WALKING, stepMillis = stepMillis).forEach { s ->
             previous?.let {
                 val moved = hypot(s.dEastMeters - it.dEastMeters, s.dNorthMeters - it.dNorthMeters)
                 assertTrue("walked ${"%.2f".format(moved / dt)} m/s", moved / dt < 12.0)
@@ -80,56 +113,45 @@ class JitterEngineTest {
     }
 
     @Test
-    fun `speed matches the distance actually covered`() {
-        val stepNanos = second / 5
-        val dt = stepNanos / 1_000_000_000.0
-        var previous: JitterEngine.Sample? = null
-        walk(radius = 15.0, mode = JitterEngine.Mode.WALKING, stepNanos = stepNanos).forEach { s ->
-            previous?.let {
-                val moved = hypot(s.dEastMeters - it.dEastMeters, s.dNorthMeters - it.dNorthMeters)
-                assertEquals((moved / dt).toFloat(), s.speedMps, 0.01f)
-            }
-            previous = s
-        }
+    fun `speed is faster the faster the mode`() {
+        fun meanSpeed(mode: JitterEngine.Mode) =
+            path(radius = 30.0, mode = mode, steps = 2_000).map { it.speedMps }.average()
+
+        val stationary = meanSpeed(JitterEngine.Mode.STATIONARY)
+        val walking = meanSpeed(JitterEngine.Mode.WALKING)
+        val driving = meanSpeed(JitterEngine.Mode.DRIVING)
+        assertTrue("$stationary !< $walking", stationary < walking)
+        assertTrue("$walking !< $driving", walking < driving)
     }
 
     @Test
     fun `bearing stays a compass value`() {
-        walk(radius = 15.0, mode = JitterEngine.Mode.DRIVING).forEach {
+        path(radius = 15.0, mode = JitterEngine.Mode.DRIVING).forEach {
             assertTrue("bearing ${it.bearingDeg}", it.bearingDeg >= 0f && it.bearingDeg < 360f)
         }
     }
 
     @Test
-    fun `a long gap does not produce one enormous step`() {
-        // Waking up after ten minutes must not move the device ten minutes'
-        // worth of wander in a single sample.
-        val engine = JitterEngine(10.0, JitterEngine.Mode.DRIVING, Random(7))
-        engine.sample(second)
-        val after = engine.sample(second + 600 * second)
-        assertTrue(hypot(after.dEastMeters, after.dNorthMeters) <= 10.0 + 1e-6)
+    fun `the path does not repeat within an hour`() {
+        // Three coprime periods per axis; a visibly cyclic track would be as
+        // much of a tell as no movement at all.
+        val first = JitterEngine.sample(10.0, JitterEngine.Mode.WALKING, start)
+        val later = JitterEngine.sample(10.0, JitterEngine.Mode.WALKING, start + 3_600_000)
+        assertNotEquals(first.dEastMeters, later.dEastMeters, 0.01)
     }
 
     @Test
-    fun `a single large step cannot overshoot the boundary`() {
-        // The escape hatch is a step longer than twice the radius: reflecting
-        // such a step once lands it back outside. Driving mode over a five
-        // second interval moves far enough for that to happen, so search for it
-        // rather than trusting one seed.
-        (1..400).forEach { seed ->
-            val engine = JitterEngine(3.0, JitterEngine.Mode.DRIVING, Random(seed))
-            var now = second
-            engine.sample(now)
-            repeat(20) {
-                now += 5 * second
-                val sample = engine.sample(now)
-                val distance = hypot(sample.dEastMeters, sample.dNorthMeters)
-                assertTrue(
-                    "seed $seed escaped: ${"%.2f".format(distance)}m > 3m",
-                    distance <= 3.0 + 1e-6
-                )
-            }
-        }
+    fun `the two axes are not the same curve`() {
+        // Equal offsets on both axes would be a diagonal line, not a wander.
+        val samples = path(radius = 10.0, mode = JitterEngine.Mode.WALKING, steps = 500)
+        assertTrue(samples.any { kotlin.math.abs(it.dEastMeters - it.dNorthMeters) > 1.0 })
+    }
+
+    @Test
+    fun `offset converts metres to degrees around the anchor`() {
+        val (lat, lng) = JitterEngine.offset(39.9042, 116.4074, dEast = 0.0, dNorth = 111.32)
+        assertEquals(39.9052, lat, 1e-4)
+        assertEquals(116.4074, lng, 1e-9)
     }
 
     @Test

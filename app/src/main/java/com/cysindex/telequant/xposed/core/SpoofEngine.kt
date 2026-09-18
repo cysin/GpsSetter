@@ -70,12 +70,6 @@ object SpoofEngine {
     @Volatile
     private var cachedAtNanos = 0L
 
-    @Volatile
-    private var jitter: JitterEngine? = null
-
-    @Volatile
-    private var jitterKey: String = ""
-
     private val random = Random.Default
 
     val isEnabled: Boolean get() = PrefsBridge.isStarted
@@ -113,14 +107,10 @@ object SpoofEngine {
         val mode = runCatching { JitterEngine.Mode.valueOf(PrefsBridge.jitterMode) }
             .getOrDefault(JitterEngine.Mode.STATIONARY)
 
-        // Rebuild the walk only when its parameters change; otherwise its
-        // internal state (and therefore the continuity of the track) is lost.
-        val key = "$radius|$mode"
-        if (key != jitterKey || jitter == null) {
-            jitter = JitterEngine(radius, mode)
-            jitterKey = key
-        }
-        val sample = jitter!!.sample(nowNanos)
+        // Evaluated against the wall clock rather than accumulated here: this
+        // object is a per-process singleton, and the module is loaded into every
+        // hooked app, so state kept here made each app wander independently.
+        val sample = JitterEngine.sample(radius, mode, System.currentTimeMillis())
 
         var (lat, lng) = JitterEngine.offset(
             anchorLat, anchorLng, sample.dEastMeters, sample.dNorthMeters

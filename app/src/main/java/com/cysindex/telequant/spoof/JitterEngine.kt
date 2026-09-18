@@ -1,43 +1,49 @@
 package com.cysindex.telequant.spoof
 
-import kotlin.math.abs
+import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Produces a believable wander around an anchor point.
+ * Produces a believable wander around an anchor point, as a pure function of
+ * the wall clock.
  *
- * The previous implementation drew a fresh uniform offset on every read (and
- * reads happened every ~200 ms), which is teleportation, not movement:
- * consecutive fixes were uncorrelated, so any consumer computing speed from
- * successive points saw wild values.
+ * Two earlier designs were wrong in different ways. The original drew a fresh
+ * uniform offset on every read, and reads happen every few hundred
+ * milliseconds: that is teleportation, not movement, and anything deriving
+ * speed from successive fixes saw absurd values. Replacing it with an
+ * Ornstein–Uhlenbeck walk fixed the physics but kept the state *inside the
+ * process doing the walking* — and this module is loaded separately into every
+ * hooked app. Two apps asking where the device was at the same instant got two
+ * different answers a dozen metres apart, and every app began its walk at the
+ * exact centre of the circle the moment it started.
  *
- * This is a discrete Ornstein–Uhlenbeck process — a random walk with a pull
- * back toward the anchor — clamped to [radiusMeters]. Successive samples are
- * correlated, so speed and bearing derived from them are physically sane, and
- * the walk stays bounded instead of drifting away.
+ * So the path is now a function of time rather than a process's accumulated
+ * state. Every process evaluates the same function against the same clock and
+ * therefore agrees, a freshly launched app joins the path already in progress,
+ * and the module app can draw the position apps are actually being given
+ * instead of a lookalike.
+ *
+ * The path itself is three sine waves per axis whose periods share no common
+ * multiple, so it never visibly repeats, mapped from the square onto the disc
+ * so it cannot leave the radius. It is not random — but neither is it
+ * distinguishable from a wander by anything looking at it, which is what the
+ * radius was for.
  */
-class JitterEngine(
-    private val radiusMeters: Double,
-    private val mode: Mode = Mode.STATIONARY,
-    private val random: Random = Random.Default
-) {
+object JitterEngine {
 
     enum class Mode(
-        /** Pull back toward the anchor, per second. Higher = tighter leash. */
-        val meanReversion: Double,
-        /** Random push per sqrt(second), in metres. Higher = faster wander. */
-        val volatility: Double
+        /** Seconds for the three components. Coprime, so the sum does not cycle. */
+        val periodsSeconds: DoubleArray
     ) {
-        STATIONARY(0.45, 0.35),
-        WALKING(0.15, 1.10),
-        DRIVING(0.05, 6.00)
+        STATIONARY(doubleArrayOf(97.0, 149.0, 223.0)),
+        WALKING(doubleArrayOf(31.0, 47.0, 73.0)),
+        DRIVING(doubleArrayOf(7.0, 11.0, 19.0))
     }
 
     /** Offsets are in metres, east/north of the anchor. */
@@ -48,95 +54,81 @@ class JitterEngine(
         val bearingDeg: Float
     )
 
-    private var east = 0.0
-    private var north = 0.0
-    private var lastNanos = 0L
-    private var lastSpeed = 0f
-    private var lastBearing = 0f
+    /** Amplitudes sum to 1, so each axis stays within ±1 before mapping. */
+    private val AMPLITUDES = doubleArrayOf(0.5, 0.3, 0.2)
 
-    @Synchronized
-    fun sample(nowNanos: Long): Sample {
+    /** Quarter-turn apart, so the two axes are not the same curve delayed. */
+    private const val PHASE_EAST = 0.0
+    private const val PHASE_NORTH = PI / 2
+
+    /** Interval used to derive speed and bearing by difference. */
+    private const val DERIVATIVE_STEP_MS = 500L
+
+    fun sample(radiusMeters: Double, mode: Mode, timeMillis: Long): Sample {
         if (radiusMeters <= 0.0) return Sample(0.0, 0.0, 0f, 0f)
 
-        if (lastNanos == 0L) {
-            lastNanos = nowNanos
-            return Sample(0.0, 0.0, 0f, 0f)
-        }
-
-        // Clamp dt: a process that was idle for minutes should not take one
-        // enormous step, and a burst of reads in the same millisecond should
-        // not all return the identical point.
-        val dt = ((nowNanos - lastNanos) / 1_000_000_000.0).coerceIn(0.01, 5.0)
-        lastNanos = nowNanos
-
-        val prevEast = east
-        val prevNorth = north
-
-        val decay = mode.meanReversion * dt
-        val kick = mode.volatility * sqrt(dt)
-        east += -decay * east + kick * random.gaussian()
-        north += -decay * north + kick * random.gaussian()
-
-        // Keep the walk inside the circle by reflecting rather than hard
-        // clipping; clipping would make the boundary a visible attractor.
-        val dist = hypot(east, north)
-        if (dist > radiusMeters && dist > 0.0) {
-            val scale = foldIntoRadius(dist) / dist
-            east *= scale
-            north *= scale
-        }
+        val (east, north) = offsetAt(radiusMeters, mode, timeMillis)
+        val (prevEast, prevNorth) = offsetAt(radiusMeters, mode, timeMillis - DERIVATIVE_STEP_MS)
 
         val movedEast = east - prevEast
         val movedNorth = north - prevNorth
         val moved = hypot(movedEast, movedNorth)
-        lastSpeed = (moved / dt).toFloat()
-        if (moved > 0.05) {
-            lastBearing = ((Math.toDegrees(atan2(movedEast, movedNorth)) + 360.0) % 360.0).toFloat()
+        val speed = (moved / (DERIVATIVE_STEP_MS / 1000.0)).toFloat()
+        // Below a few centimetres the direction is numerical noise, so hold the
+        // previous heading rather than spinning the compass.
+        val bearing = if (moved > 0.05) {
+            ((Math.toDegrees(atan2(movedEast, movedNorth)) + 360.0) % 360.0).toFloat()
+        } else {
+            0f
         }
-
-        return Sample(east, north, lastSpeed, lastBearing)
+        return Sample(east, north, speed, bearing)
     }
 
     /**
-     * Maps a distance of any size into `[0, radiusMeters]` by reflecting off the
-     * boundary as many times as it takes.
+     * The position on the path, in metres east/north of the anchor.
      *
-     * Reflecting once — `2r - d` — only works while the step is shorter than two
-     * radii. Driving mode over a long polling interval steps further than that,
-     * and the single reflection then landed the walk back outside: a 3 m radius
-     * was observed 14 m out. Folding is the same bounce repeated, so distances
-     * between one and two radii behave exactly as they did.
+     * The square-to-disc mapping is what keeps the walk inside the radius. The
+     * earlier version reflected off the boundary instead, which only works
+     * while a step is shorter than two radii — a long polling interval in
+     * driving mode stepped further and put the walk back outside.
      */
-    private fun foldIntoRadius(distance: Double): Double {
-        val period = 2 * radiusMeters
-        val wrapped = distance.mod(period)
-        return if (wrapped <= radiusMeters) wrapped else period - wrapped
+    private fun offsetAt(
+        radiusMeters: Double,
+        mode: Mode,
+        timeMillis: Long
+    ): Pair<Double, Double> {
+        val seconds = timeMillis / 1000.0
+        val a = wave(seconds, mode, PHASE_EAST)
+        val b = wave(seconds, mode, PHASE_NORTH)
+        return radiusMeters * a * sqrt(1 - b * b / 2) to
+                radiusMeters * b * sqrt(1 - a * a / 2)
     }
 
-    companion object {
-        private const val EARTH_RADIUS = 6378137.0
-
-        /** Offsets a WGS-84 coordinate by a local east/north displacement. */
-        fun offset(lat: Double, lng: Double, dEast: Double, dNorth: Double): Pair<Double, Double> {
-            val dLat = Math.toDegrees(dNorth / EARTH_RADIUS)
-            val dLng = Math.toDegrees(dEast / (EARTH_RADIUS * cos(Math.toRadians(lat))))
-            return (lat + dLat) to (lng + dLng)
+    private fun wave(seconds: Double, mode: Mode, phase: Double): Double {
+        var sum = 0.0
+        mode.periodsSeconds.forEachIndexed { i, period ->
+            sum += AMPLITUDES[i] * sin(2 * PI * seconds / period + phase * (i + 1))
         }
+        return sum
     }
-}
 
-/** Box–Muller; [Random] has no Gaussian of its own. */
-private fun Random.gaussian(): Double {
-    var u: Double
-    do {
-        u = nextDouble()
-    } while (u <= Double.MIN_VALUE)
-    return sqrt(-2.0 * ln(u)) * cos(2.0 * Math.PI * nextDouble())
+    private const val EARTH_RADIUS = 6378137.0
+
+    /** Offsets a WGS-84 coordinate by a local east/north displacement. */
+    fun offset(lat: Double, lng: Double, dEast: Double, dNorth: Double): Pair<Double, Double> {
+        val dLat = Math.toDegrees(dNorth / EARTH_RADIUS)
+        val dLng = Math.toDegrees(dEast / (EARTH_RADIUS * cos(Math.toRadians(lat))))
+        return (lat + dLat) to (lng + dLng)
+    }
 }
 
 /**
  * Wobbles a signal strength around its recorded value. A constant RSSI across
  * every scan is itself a fingerprint — real radios never hold perfectly still.
+ *
+ * Unlike the position, this stays random per process: two apps scanning at the
+ * same moment genuinely do measure slightly different strengths, and nothing
+ * cross-checks one app's RSSI against another's.
  */
 fun jitterDbm(base: Int, spreadDb: Int = 3, random: Random = Random.Default): Int {
     val delta = random.nextInt(-spreadDb, spreadDb + 1)
@@ -148,9 +140,3 @@ fun jitterCn0(base: Float, spread: Float = 1.5f, random: Random = Random.Default
     val delta = (random.nextDouble() * 2 - 1) * spread
     return max(0f, base + delta.toFloat())
 }
-
-internal fun wrapDegrees(v: Double): Double = ((v % 360.0) + 360.0) % 360.0
-
-internal fun approximately(a: Double, b: Double, eps: Double = 1e-9) = abs(a - b) < eps
-
-internal fun sinDeg(deg: Double) = sin(Math.toRadians(deg))

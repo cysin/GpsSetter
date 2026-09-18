@@ -50,6 +50,7 @@ import com.cysindex.telequant.map.Nominatim
 import com.cysindex.telequant.map.OfflineRegions
 import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.spoof.FakeEnvironment
+import com.cysindex.telequant.spoof.JitterEngine
 import com.cysindex.telequant.spoof.SyntheticEnvironment
 import com.cysindex.telequant.spoof.TestEnvironment
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
@@ -207,6 +208,7 @@ class MapActivity : AppCompatActivity() {
                 // Sources and layers can only be added once the style is loaded.
                 installTargetLayers(loaded)
                 redrawTarget()
+                startLiveFix()
                 updateAddressLabel()
             }
 
@@ -239,6 +241,7 @@ class MapActivity : AppCompatActivity() {
     private fun installTargetLayers(loaded: Style) {
         loaded.addSource(GeoJsonSource(SOURCE_SELECTION))
         loaded.addSource(GeoJsonSource(SOURCE_ACTIVE))
+        loaded.addSource(GeoJsonSource(SOURCE_LIVE))
         loaded.addSource(GeoJsonSource(SOURCE_JITTER))
 
         val accent = MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary)
@@ -265,6 +268,7 @@ class MapActivity : AppCompatActivity() {
         // demonstrably works.
         loaded.addImage(IMAGE_SELECTION, markerPin(Color.WHITE, accent))
         loaded.addImage(IMAGE_ACTIVE, markerDot(COLOR_ACTIVE))
+        loaded.addImage(IMAGE_LIVE, liveDot(COLOR_ACTIVE))
 
         // Different shape *and* different colour. One of the two alone survives
         // neither a colour-blind user nor a greyscale screenshot.
@@ -305,6 +309,17 @@ class MapActivity : AppCompatActivity() {
                 PropertyFactory.textOptional(true)
             )
         )
+
+        // The wandering fix itself. Drawn above the anchor so it stays readable
+        // when the two coincide, which they do whenever the radius is 0.
+        loaded.addLayer(
+            SymbolLayer(LAYER_LIVE, SOURCE_LIVE).withProperties(
+                PropertyFactory.iconImage(IMAGE_LIVE),
+                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true)
+            )
+        )
     }
 
     /**
@@ -333,6 +348,24 @@ class MapActivity : AppCompatActivity() {
         canvas.drawPath(silhouette, paint)
         paint.color = fill
         canvas.drawCircle(radius, radius, radius - 3.5f * d, paint)
+        return bitmap
+    }
+
+    /**
+     * The live fix: small, solid, no halo — it has to read as a moving point
+     * rather than a second anchor.
+     */
+    private fun liveDot(fill: Int): Bitmap {
+        val d = resources.displayMetrics.density
+        val size = (16 * d).toInt()
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val centre = size / 2f
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.WHITE
+        canvas.drawCircle(centre, centre, 6f * d, paint)
+        paint.color = fill
+        canvas.drawCircle(centre, centre, 4f * d, paint)
         return bitmap
     }
 
@@ -393,6 +426,50 @@ class MapActivity : AppCompatActivity() {
                 }
             )
         )
+    }
+
+    /**
+     * Redraws the wandering fix while a simulation runs.
+     *
+     * It evaluates the same function the hooks do, against the same clock, so
+     * this is the position apps are actually being given rather than a
+     * lookalike — that is the point of the walk being a function of time rather
+     * than state accumulated inside each hooked process.
+     */
+    private val liveTick = object : Runnable {
+        override fun run() {
+            drawLiveFix()
+            binding.root.postDelayed(this, LIVE_REFRESH_MS)
+        }
+    }
+
+    private fun startLiveFix() {
+        binding.root.removeCallbacks(liveTick)
+        if (spoofing) binding.root.post(liveTick)
+    }
+
+    private fun stopLiveFix() {
+        binding.root.removeCallbacks(liveTick)
+        drawLiveFix()
+    }
+
+    private fun drawLiveFix() {
+        val source = style?.getSourceAs<GeoJsonSource>(SOURCE_LIVE) ?: return
+        val anchor = activePosition()
+        val features = if (anchor == null) {
+            emptyList()
+        } else {
+            val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
+            val mode = runCatching {
+                JitterEngine.Mode.valueOf(PrefManager.jitterMode.orEmpty())
+            }.getOrDefault(JitterEngine.Mode.STATIONARY)
+            val sample = JitterEngine.sample(radius, mode, System.currentTimeMillis())
+            val (fixLat, fixLng) = JitterEngine.offset(
+                anchor.first, anchor.second, sample.dEastMeters, sample.dNorthMeters
+            )
+            listOf(Feature.fromGeometry(Point.fromLngLat(fixLng, fixLat)))
+        }
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
     /** The position currently being fed to apps, or null when stopped. */
@@ -481,12 +558,15 @@ class MapActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         mapView.onResume()
+        startLiveFix()
         viewModel.updateXposedState()
         // Radius or style may have been changed in settings while we were away.
         redrawTarget()
     }
 
     override fun onPause() {
+        // Nothing to animate for a screen nobody is looking at.
+        binding.root.removeCallbacks(liveTick)
         super.onPause()
         mapView.onPause()
     }
@@ -527,6 +607,7 @@ class MapActivity : AppCompatActivity() {
             spoofing = false
             updateStartStopVisibility()
             redrawTarget()
+            stopLiveFix()
             cancelNotification()
             showToast(getString(R.string.location_unset))
         }
@@ -587,6 +668,7 @@ class MapActivity : AppCompatActivity() {
         spoofing = true
         updateStartStopVisibility()
         redrawTarget()
+        startLiveFix()
         showStartNotification(selectionName())
         showToast(getString(R.string.location_set))
     }
@@ -1238,8 +1320,11 @@ class MapActivity : AppCompatActivity() {
         const val SOURCE_SELECTION = "telequant-selection"
         const val SOURCE_ACTIVE = "telequant-active"
         const val SOURCE_JITTER = "telequant-jitter"
+        const val SOURCE_LIVE = "telequant-live"
         const val LAYER_SELECTION = "telequant-selection"
         const val LAYER_ACTIVE = "telequant-active"
+        const val LAYER_LIVE = "telequant-live"
+        const val IMAGE_LIVE = "telequant-live-icon"
         const val IMAGE_SELECTION = "telequant-selection-icon"
         const val IMAGE_ACTIVE = "telequant-active-icon"
 
@@ -1270,6 +1355,12 @@ class MapActivity : AppCompatActivity() {
 
         /** How long to wait for a fresh fix before giving up on the radio. */
         const val FIX_TIMEOUT_MS = 15_000L
+
+        /**
+         * How often the live fix is redrawn. Fast enough to read as motion,
+         * slow enough that it is not redrawing the map every frame.
+         */
+        const val LIVE_REFRESH_MS = 400L
         const val EARTH_RADIUS_M = 6378137.0
 
         /**
