@@ -10,16 +10,30 @@
     android:layout_height="wrap_content">
 
 
-    <TextView
-        android:textAppearance="@style/TextAppearance.AppCompat.Widget.TextView.SpinnerItem"
-        android:id="@+id/address"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_weight="1"
-        android:text="@string/address"
+        android:orientation="vertical"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"/>
+        android:clickable="true"
+        android:id="@+id/address_row">
+
+        <TextView
+            android:textAppearance="@style/TextAppearance.AppCompat.Widget.TextView.SpinnerItem"
+            android:id="@+id/address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/address"/>
+
+        <TextView
+            android:id="@+id/favourite_badge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:alpha="0.7"/>
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/del"

@@ -63,10 +63,23 @@ class MainViewModel(
      * implementation scanned for a free slot with a blocking query in a
      * `while (true)` loop, which never terminated once every probed id existed.
      */
-    fun storeFavorite(address: String, lat: Double, lon: Double) = onIO {
+    fun storeFavorite(
+        address: String,
+        lat: Double,
+        lon: Double,
+        environment: String? = null,
+        capturedAt: Long = 0L
+    ) = onIO {
         _response.postValue(
             favouriteRepository.addNewFavourite(
-                Favourite(id = null, address = address, lat = lat, lng = lon)
+                Favourite(
+                    id = null,
+                    address = address,
+                    lat = lat,
+                    lng = lon,
+                    environment = environment,
+                    capturedAt = capturedAt
+                )
             )
         )
     }

@@ -6,12 +6,6 @@
 
 
     <item
-        android:id="@+id/record_environment"
-        android:title="@string/record_environment"
-        app:showAsAction="always"
-        android:icon="@drawable/ic_accuracy"/>
-
-    <item
         android:id="@+id/load_test_env"
         android:title="@string/test_env"
         app:showAsAction="always"

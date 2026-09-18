@@ -63,15 +63,9 @@
     <string name="gcj02_summary">Émettre le système de coordonnées décalé utilisé en Chine continentale. Sans effet ailleurs.</string>
     <string name="spoof_timezone">Fuseau horaire</string>
     <string name="spoof_timezone_summary">Signaler aussi le fuseau du lieu simulé. Affecte toutes les dates formatées par l\'application.</string>
-    <string name="record_environment">Enregistrer ce lieu</string>
     <string name="recording_title">Enregistrement</string>
     <string name="recording_message">Capture du GPS, des antennes-relais, du Wi-Fi et du Bluetooth. Environ 15 secondes.</string>
-    <string name="recording_done">Enregistrement terminé</string>
     <string name="recording_summary">%1$d antennes-relais, %2$d points d\'accès et %3$d balises capturés.</string>
-    <string name="recording_missing">Non capturé :</string>
-    <string name="recording_use">Utiliser ce lieu</string>
-    <string name="recording_discard">Ignorer</string>
-    <string name="recording_applied">Lieu appliqué</string>
     <string name="recording_failed">Échec de l\'enregistrement</string>
     <string name="offline_download">Télécharger cette zone</string>
     <string name="offline_start">Télécharger</string>
@@ -95,7 +89,6 @@
     <string name="jitter_radius_value">Varie jusqu\'à %1$d m autour du point</string>
     <string name="favourites_empty">Aucun lieu enregistré.\nAppuyez sur l\'étoile pour en ajouter un.</string>
     <string name="recording_keeps_anchor">Aucune position capturée : les données radio seront rejouées au point déjà défini sur la carte.</string>
-    <string name="recording_used_map_point">Pas de position GPS en intérieur : les données radio sont liées au point choisi sur la carte (%1$.5f, %2$.5f). Déplacez le repère si ce n’est pas le bon endroit.</string>
     <string name="test_env">Charger un environnement de test</string>
     <string name="test_env_message">Remplace les données radio par %1$d cellules, %2$d points d’accès et %3$d balises n’appartenant à aucun réseau réel — opérateur %4$s, SSID commençant par %5$s.\n\nPour vérifier que les hooks s’appliquent : un enregistrement de ce téléphone contient ses propres antennes réelles et ne permet donc pas de distinguer une lecture interceptée. La position ne change pas.</string>
     <string name="test_env_apply">Charger</string>

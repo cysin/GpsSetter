@@ -59,15 +59,9 @@
     <string name="stop">Stop</string>
     <string name="start_spoofing">Set location</string>
     <!-- Environment recording -->
-    <string name="record_environment">Record this place</string>
-    <string name="recording_title">Recording</string>
-    <string name="recording_message">Capturing GPS, cell towers, Wi-Fi and Bluetooth. This takes about 15 seconds.</string>
-    <string name="recording_done">Recording finished</string>
+    <string name="recording_title">Recording the surroundings</string>
+    <string name="recording_message">Capturing cell towers, Wi-Fi and Bluetooth. This takes a few seconds.</string>
     <string name="recording_summary">Captured %1$d cell towers, %2$d access points and %3$d beacons.</string>
-    <string name="recording_missing">Not captured:</string>
-    <string name="recording_use">Use this place</string>
-    <string name="recording_discard">Discard</string>
-    <string name="recording_applied">Place applied</string>
     <string name="recording_failed">Recording failed</string>
 
 
@@ -95,9 +89,37 @@
     <string name="jitter_radius_value">Wanders up to %1$d m from the anchor</string>
     <string name="favourites_empty">No saved places yet.\nTap the star on the map to add one.</string>
     <string name="recording_keeps_anchor">No position was captured, so the radio data will be replayed at the point already set on the map.</string>
-    <string name="recording_used_map_point">No GPS fix indoors, so the radio data is bound to the point selected on the map (%1$.5f, %2$.5f). Move the map pin first if that is not the spot.</string>
     <string name="test_env">Load test environment</string>
     <string name="test_env_message">Replaces the radio data with %1$d cells, %2$d access points and %3$d beacons that belong to no real network — operator %4$s, SSIDs starting %5$s.\n\nFor checking the hooks fire: a recording from this phone contains its own real towers, so it cannot tell a hooked read from an unhooked one. The position stays where it is.</string>
     <string name="test_env_apply">Load</string>
     <string name="test_env_applied">Test environment loaded</string>
+
+    <!-- markers -->
+    <string name="marker_active">Simulating here</string>
+    <string name="marker_selection_real">Device position</string>
+    <string name="marker_selection_manual">Selected point</string>
+    <string name="locating">Reading the real position…</string>
+
+    <!-- self-spoof warning -->
+    <string name="self_spoof_title">This reading may not be real</string>
+    <string name="self_spoof_message">The position just read back matches the point being simulated. This app is normally excluded from its own hooks, so that usually means it has been added to its own scope in the Xposed manager. Remove it there, or treat this reading as the simulated value rather than your actual location.</string>
+
+    <!-- start mode -->
+    <string name="mode_title">What to simulate</string>
+    <string name="mode_full_option">Position and the recorded surroundings (%1$d cells, %2$d Wi-Fi, %3$d beacons)</string>
+    <string name="mode_position_option">Position only — the carrier stays real, tower and access-point identifiers are fabricated so a lookup finds nothing and the app falls back to GNSS</string>
+    <string name="start">Start</string>
+
+    <!-- favourites -->
+    <string name="favourite_name_hint">Name for this place</string>
+    <string name="favourite_record">Also record the cells, Wi-Fi and beacons here</string>
+    <string name="favourite_record_note">Recorded where you are now, saved against the coordinate above.</string>
+    <string name="selection_from_fix">From the device position (accuracy %1$d m)</string>
+    <string name="selection_from_map">Chosen on the map</string>
+    <string name="selection_distance">%1$s from the device position</string>
+    <string name="selection_distance_unknown">Device position unknown — tap the locate button to compare</string>
+    <string name="favourite_loaded_full">Loaded with %1$d cells, %2$d Wi-Fi, %3$d beacons</string>
+    <string name="favourite_loaded_position">Loaded — coordinate only</string>
+    <string name="favourite_badge_full">%1$d cells · %2$d Wi-Fi · %3$d beacons</string>
+    <string name="favourite_badge_position">Coordinate only</string>
 </resources>

@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.cysindex.telequant.R
 import com.cysindex.telequant.room.Favourite
+import com.cysindex.telequant.spoof.FakeEnvironment
 
 class FavListAdapter(
     ) : ListAdapter<Favourite,FavListAdapter.ViewHolder>(FavListComparetor()) {
@@ -29,14 +30,25 @@ class FavListAdapter(
    inner class ViewHolder(view: View): RecyclerView.ViewHolder(view) {
 
         private val address: TextView = view.findViewById(R.id.address)
+        private val badge: TextView = view.findViewById(R.id.favourite_badge)
+        private val row: View = view.findViewById(R.id.address_row)
         private val delete: ImageView = itemView.findViewById(R.id.del)
 
         fun bind(favorite: Favourite){
             address.text = favorite.address
+            // Whether a place carries a recording decides what Start can offer
+            // for it, so it has to be visible before the place is picked.
+            val environment = FakeEnvironment.parse(favorite.environment)
+            badge.text = environment?.let {
+                badge.context.getString(
+                    R.string.favourite_badge_full,
+                    it.cells.size, it.wifis.size, it.beacons.size
+                )
+            } ?: badge.context.getString(R.string.favourite_badge_position)
             delete.setOnClickListener {
                 onItemDelete?.invoke(favorite)
             }
-            address.setOnClickListener {
+            row.setOnClickListener {
                 onItemClick?.invoke(favorite)
             }
         }

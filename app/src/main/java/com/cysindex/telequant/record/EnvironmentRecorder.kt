@@ -11,7 +11,6 @@ import android.location.GnssStatus
 import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.os.CancellationSignal
 import android.telephony.CellIdentityGsm
 import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
@@ -43,11 +42,18 @@ import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Captures the radio environment at the device's current position.
+ * Captures the radio environment around the device — cells, Wi-Fi, beacons,
+ * operator, satellites — and deliberately **not** its position.
  *
- * The capture surface deliberately mirrors the hook surface one-for-one:
- * anything not recorded here has to be synthesised at replay time, and
- * synthesised data is what produces combinations the platform never emits.
+ * The coordinate comes from the point selected on the map instead. Reading it
+ * here solved nothing and broke often: indoors the fix times out, which is
+ * exactly where a Wi-Fi and beacon recording is worth making, and the recorder
+ * then had to either discard a perfectly good capture or quietly substitute the
+ * map point anyway. The caller already knows which place this belongs to.
+ *
+ * The capture surface otherwise mirrors the hook surface one-for-one: anything
+ * not recorded here has to be synthesised at replay time, and synthesised data
+ * is what produces combinations the platform never emits.
  *
  * Raw payloads (a BLE advertisement, a Wi-Fi capabilities string) are kept
  * byte-for-byte rather than parsed and rebuilt, for the same reason.
@@ -60,31 +66,33 @@ class EnvironmentRecorder(private val context: Context) {
         val missing: List<String>
     )
 
-    suspend fun record(): Result = withContext(Dispatchers.IO) {
-        // Five captures append to this concurrently; a plain ArrayList would
+    /**
+     * @param lat the selected point this capture belongs to; the recorder does
+     *   not look up a position of its own.
+     */
+    suspend fun record(lat: Double, lng: Double): Result = withContext(Dispatchers.IO) {
+        // Four captures append to this concurrently; a plain ArrayList would
         // drop entries or corrupt itself, and the whole point of the list is to
         // tell the user which signals are absent.
         val missing = CopyOnWriteArrayList<String>()
 
         coroutineScope {
-            val locationJob = async { captureLocation(missing) }
             val gnssJob = async { captureSatellites() }
             val cellJob = async { captureCells(missing) }
             val wifiJob = async { captureWifi(missing) }
             val beaconJob = async { captureBeacons(missing) }
 
-            awaitAll(locationJob, gnssJob, cellJob, wifiJob, beaconJob)
+            awaitAll(gnssJob, cellJob, wifiJob, beaconJob)
 
-            val fix = locationJob.await()
             val cells = cellJob.await()
             val operator = captureOperator()
 
             Result(
                 environment = FakeEnvironment(
-                    lat = fix?.latitude ?: 0.0,
-                    lng = fix?.longitude ?: 0.0,
-                    altitude = fix?.altitude ?: 0.0,
-                    accuracy = fix?.accuracy ?: 10f,
+                    lat = lat,
+                    lng = lng,
+                    altitude = 0.0,
+                    accuracy = 10f,
                     cells = cells,
                     wifis = wifiJob.await(),
                     beacons = beaconJob.await(),
@@ -101,41 +109,6 @@ class EnvironmentRecorder(private val context: Context) {
         }
     }
 
-    // --- position -----------------------------------------------------------
-
-    @SuppressLint("MissingPermission")
-    private suspend fun captureLocation(missing: MutableList<String>): android.location.Location? {
-        if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            missing += "GPS (location permission)"
-            return null
-        }
-        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-        val provider = when {
-            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            else -> {
-                missing += "GPS (location services off)"
-                return null
-            }
-        }
-
-        val deferred = CompletableDeferred<android.location.Location?>()
-        val signal = CancellationSignal()
-        runCatching {
-            lm.getCurrentLocation(provider, signal, context.mainExecutor) { location ->
-                deferred.complete(location)
-            }
-        }.onFailure { return null }
-
-        return withTimeoutOrNull(FIX_TIMEOUT_MS) { deferred.await() }
-            ?: run {
-                signal.cancel()
-                missing += "GPS (no fix within ${FIX_TIMEOUT_MS / 1000}s)"
-                null
-            }
-    }
-
-    @SuppressLint("MissingPermission")
     private suspend fun captureSatellites(): List<SatelliteRecord> {
         if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) return emptyList()
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -383,7 +356,6 @@ class EnvironmentRecorder(private val context: Context) {
 
     private companion object {
         const val TAG = "TeleQuantRec"
-        const val FIX_TIMEOUT_MS = 12_000L
         const val GNSS_TIMEOUT_MS = 8_000L
         const val WIFI_SETTLE_MS = 3_000L
         const val BLE_SCAN_MS = 5_000L
