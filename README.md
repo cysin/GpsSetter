@@ -51,7 +51,7 @@ app/src/main/java/com/cysindex/telequant/
 │   │   ├── LocationFactory.kt    the one place a Location is built or rewritten
 │   │   └── LocationDispatcher.kt synthetic updates on a shared scheduler
 │   └── hooks/                  one file per signal family
-├── record/EnvironmentRecorder.kt   captures a place's radio environment
+├── record/EnvironmentRecorder.kt   captures the radio environment (never the position)
 ├── map/                        MapLibre setup, offline regions, Nominatim
 └── ui/, room/, utils/          the module app itself
 
@@ -162,11 +162,41 @@ network type vs cell type, Wi-Fi absent-value semantics (`"<unknown ssid>"`, not
   the signatures differ across API levels and OEM forks, and a type that cannot
   be constructed is dropped from the list with a warning rather than faked as
   some other type.
-- With no recorded environment, cell/Wi-Fi/Bluetooth are not spoofed at all —
-  only the GPS path works. Satellites are synthesised.
+- In position-only mode the cells and access points are fabricated under the
+  subscriber's real operator, so a database lookup resolves nothing and the app
+  falls back to GNSS. An app that trusts a tower lookup *and* cannot fall back
+  will simply fail to locate rather than being told the chosen place.
 - Bonded Bluetooth devices are reported as an empty set.
 - `BluetoothDevice.getName()` returns null for any address the recording does
   not contain, rather than the device's real name.
+
+---
+
+## Using it
+
+Three things can be true of a point at once, so the map shows them apart:
+
+| | |
+|---|---|
+| **Hollow pin** | the selected point — where Start would put you |
+| **Filled green dot** | the position apps are being told right now, with the jitter ring around it. Absent when stopped. |
+| **Locate button** | moves the selection to where the device actually is. The module excludes itself from its own hooks, so this reads the real position even mid-simulation; if the reading lands on the simulated point it says so, because that is what adding this app to its own Xposed scope looks like. |
+
+**Saving a place.** The star saves the selected point, and offers to record the
+cells, Wi-Fi and beacons around you at the same time. The recorder never
+captures a position — the coordinate is the selected point — so recording works
+indoors, where a GPS fix would time out and where a Wi-Fi recording is worth
+most. The dialog shows how far the selection is from the device's actual
+position rather than refusing: capturing one place's surroundings to replay at
+another is a legitimate thing to want.
+
+**Starting.** With a recording attached, Start asks which to use:
+
+- *Position and the recorded surroundings* — replays the whole environment.
+- *Position only* — the carrier stays real and the tower and access-point
+  identifiers are fabricated, so a lookup finds nothing and the app falls back
+  to GNSS. Leaving the radio untouched would let a tower lookup report the real
+  city; blanking it produces `MCC 460 + CID 0`, which the platform never emits.
 
 ---
 
