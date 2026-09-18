@@ -19,8 +19,8 @@
 
 
     <!-- Errors -->
-    <string name="error_xposed_module_missing">Xposed module is not enabled</string>
-    <string name="error_xposed_module_missing_desc">Enable this module in LSPosed Manager.\n\nDon’t have LSPosed?\n\t1. Install the Riru or Zygisk module from Magisk Manager\n\t2. Install the “Riru or Zygisk - LSPosed” module from Magisk Manager\n\t3. Open this app again</string>
+    <string name="error_xposed_module_missing">Could not confirm the module is active</string>
+    <string name="error_xposed_module_missing_desc">Enable this module in your Xposed manager (LSPosed, Vector) and reopen this app.\n\nIf it is already enabled, this check needs TeleQuant to be in its own scope — that is the only way the module can be loaded into this app to report back. Spoofing does not need it: the module excludes itself from its own hooks either way, so leaving TeleQuant out of scope costs nothing but this message.</string>
     <!-- About -->
 
     <string name="about">About</string>
@@ -102,10 +102,6 @@
     <string name="marker_selection_real">Device position</string>
     <string name="marker_selection_manual">Selected point</string>
     <string name="locating">Reading the real position…</string>
-
-    <!-- self-spoof warning -->
-    <string name="self_spoof_title">This reading may not be real</string>
-    <string name="self_spoof_message">The position just read back matches the point being simulated. This app is normally excluded from its own hooks, so that usually means it has been added to its own scope in the Xposed manager. Remove it there, or treat this reading as the simulated value rather than your actual location.</string>
 
     <!-- start mode -->
     <string name="mode_title">What to simulate</string>

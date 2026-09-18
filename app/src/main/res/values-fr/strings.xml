@@ -21,8 +21,6 @@
 
 
     <!-- Errors -->
-    <string name="error_xposed_module_missing">Le module n\’est pas activé</string>
-    <string name="error_xposed_module_missing_desc">Activer ce module dans LSPosed Manager.\n\nVous n\’avez pas LSPosed?\n\t1. Installer le module Riru ou Zygisk depuis from Magisk Manager\n\t2. Installer le module “Riru ou Zygisk - LSPosed” depuis Magisk Manager\n\t3. Ouvrir à nouveau cette application</string>
     <!-- About -->
 
     <string name="about">A propos</string>
@@ -102,9 +100,6 @@
     <string name="marker_selection_manual">Point choisi</string>
     <string name="locating">Lecture de la position réelle…</string>
 
-    <string name="self_spoof_title">Cette lecture n\'est peut-être pas réelle</string>
-    <string name="self_spoof_message">La position qui vient d\'être lue correspond au point simulé. Cette application est normalement exclue de ses propres hooks, ce qui veut dire en général qu\'elle a été ajoutée à sa propre portée dans le gestionnaire Xposed. Retirez-la de cette portée, ou considérez cette lecture comme la valeur simulée plutôt que votre position réelle.</string>
-
     <string name="mode_title">Que simuler</string>
     <string name="mode_full_option">Position et environnement enregistré (%1$d cellules, %2$d Wi-Fi, %3$d balises)</string>
     <string name="mode_position_option">Position seule — l\'opérateur reste réel, les identifiants de cellules et de points d\'accès sont fabriqués, de sorte qu\'une recherche ne trouve rien et que l\'application retombe sur le GNSS</string>
@@ -127,4 +122,6 @@
     <string name="geocoder_unreachable_message">La requête vers nominatim.openstreetmap.org n\'a pas abouti : il ne s\'agit donc pas d\'une faute d\'orthographe.\n\nLe proxy pour la recherche est %3$s (%1$s:%2$s). Les tuiles ne sont pas concernées : elles ont leur propre réglage.</string>
     <string name="geocoder_proxy_on">activé</string>
     <string name="geocoder_proxy_off">désactivé</string>
+    <string name="error_xposed_module_missing">Impossible de confirmer que le module est actif</string>
+    <string name="error_xposed_module_missing_desc">Activez ce module dans votre gestionnaire Xposed (LSPosed, Vector) puis rouvrez l\'application.\n\nS\'il est déjà activé, cette vérification exige que TeleQuant figure dans sa propre portée — c\'est le seul moyen pour le module d\'être chargé dans cette application et de le signaler. La simulation n\'en a pas besoin : le module s\'exclut de ses propres hooks dans tous les cas, donc laisser TeleQuant hors de sa portée ne coûte que ce message.</string>
 </resources>

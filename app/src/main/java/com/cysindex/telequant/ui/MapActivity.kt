@@ -883,7 +883,11 @@ class MapActivity : AppCompatActivity() {
                 xposedDialog = MaterialAlertDialogBuilder(this).run {
                     setTitle(R.string.error_xposed_module_missing)
                     setMessage(R.string.error_xposed_module_missing_desc)
-                    setCancelable(BuildConfig.DEBUG)
+                    // Dismissable, because a false negative is expected: the
+                    // check only works when this app is in its own scope, and
+                    // being out of scope is a legitimate choice.
+                    setCancelable(true)
+                    setPositiveButton(android.R.string.ok, null)
                     show()
                 }
             }
@@ -1117,9 +1121,7 @@ class MapActivity : AppCompatActivity() {
      *
      * This reads the real position even while a simulation is running, because
      * the hook entry calls `loadApp(isExcludeSelf = true)` — the module is never
-     * injected into itself. The one way to break that is to add this app to its
-     * own scope in the Xposed manager, which [warnIfSelfSpoofed] checks for
-     * rather than letting the button quietly return the simulated point.
+     * injected into itself, in its own scope or out of it.
      *
      * Uses the platform LocationManager instead of Play Services, so this works
      * on GMS-free devices — a realistic case for a rooted audience.
@@ -1177,32 +1179,12 @@ class MapActivity : AppCompatActivity() {
 
     private fun applyRealFix(location: Location) {
         lastRealFix = location
-        warnIfSelfSpoofed(location)
         moveTarget(
             location.latitude,
             location.longitude,
             recentre = true,
             origin = SelectionOrigin.REAL_FIX
         )
-    }
-
-    /**
-     * A "real" fix landing on the simulated point is the signature of this app
-     * having been added to its own Xposed scope. Saying so beats letting the
-     * user record an environment they believe is their surroundings.
-     */
-    private fun warnIfSelfSpoofed(fix: Location) {
-        if (!spoofing) return
-        val simulated = Location(fix.provider).apply {
-            latitude = PrefManager.getLat
-            longitude = PrefManager.getLng
-        }
-        if (fix.distanceTo(simulated) > SELF_SPOOF_TOLERANCE_M) return
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.self_spoof_title)
-            .setMessage(R.string.self_spoof_message)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
     }
 
     private fun checkPermissions(): Boolean =
@@ -1381,13 +1363,6 @@ class MapActivity : AppCompatActivity() {
         val COLOR_ACTIVE = Color.parseColor("#00A86B")
         const val PROP_LABEL = "label"
         const val CIRCLE_SEGMENTS = 64
-
-        /**
-         * How close a "real" fix has to land to the simulated point before it
-         * is treated as this app having been hooked by itself. Wide enough to
-         * cover the jitter radius and ordinary GNSS error.
-         */
-        const val SELF_SPOOF_TOLERANCE_M = 60f
 
         /** How long to wait for a fresh fix before giving up on the radio. */
         const val FIX_TIMEOUT_MS = 15_000L
