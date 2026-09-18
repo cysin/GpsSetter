@@ -19,8 +19,10 @@
 
 
     <!-- Errors -->
+    <string name="module_active">Module active</string>
+    <string name="module_unconfirmed">Activation not confirmed — tap</string>
     <string name="error_xposed_module_missing">Could not confirm the module is active</string>
-    <string name="error_xposed_module_missing_desc">Enable this module in your Xposed manager (LSPosed, Vector) and reopen this app.\n\nIf it is already enabled, this check needs TeleQuant to be in its own scope — that is the only way the module can be loaded into this app to report back. Spoofing does not need it: the module excludes itself from its own hooks either way, so leaving TeleQuant out of scope costs nothing but this message.</string>
+    <string name="error_xposed_module_missing_desc">Enable this module in your Xposed manager (LSPosed, Vector) and reopen this app.\n\nIf it is already enabled, this can still be a false negative: the check needs the framework to load the module into this app so it can report back. Spoofing itself is unaffected — the module excludes itself from its own hooks, so TeleQuant does not need to be in its own scope.</string>
     <!-- About -->
 
     <string name="about">About</string>

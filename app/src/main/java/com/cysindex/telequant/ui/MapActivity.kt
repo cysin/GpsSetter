@@ -124,7 +124,6 @@ class MapActivity : AppCompatActivity() {
 
     private var baseSearchBottomMargin = -1
     private var addressJob: Job? = null
-    private var xposedDialog: AlertDialog? = null
     private lateinit var alertDialog: MaterialAlertDialogBuilder
     private lateinit var dialog: AlertDialog
 
@@ -875,21 +874,35 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Reports what the activation check knows, in the drawer rather than as a
+     * dialog on every launch.
+     *
+     * The check works by the framework loading the module into this app so it
+     * can report back. Vector does that regardless of the scope list — verified
+     * with TeleQuant absent from its own scope and the status still reading
+     * active — but not every framework is guaranteed to, and none of this is
+     * needed for spoofing anyway, since hooks are installed with
+     * `loadApp(isExcludeSelf = true)` and never reach this app.
+     *
+     * So a negative answer is worth showing and not worth blocking on. It used
+     * to be a modal that release builds would not let you dismiss, which turned
+     * a possible false negative into an unusable app.
+     */
     private fun isModuleEnable() {
+        val status = binding.navView.getHeaderView(0)
+            ?.findViewById<TextView>(R.id.header_status) ?: return
         viewModel.isXposed.observe(this) { isXposed ->
-            xposedDialog?.dismiss()
-            xposedDialog = null
-            if (!isXposed) {
-                xposedDialog = MaterialAlertDialogBuilder(this).run {
-                    setTitle(R.string.error_xposed_module_missing)
-                    setMessage(R.string.error_xposed_module_missing_desc)
-                    // Dismissable, because a false negative is expected: the
-                    // check only works when this app is in its own scope, and
-                    // being out of scope is a legitimate choice.
-                    setCancelable(true)
-                    setPositiveButton(android.R.string.ok, null)
-                    show()
-                }
+            status.text = getString(
+                if (isXposed) R.string.module_active else R.string.module_unconfirmed
+            )
+            status.setOnClickListener {
+                if (isXposed) return@setOnClickListener
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.error_xposed_module_missing)
+                    .setMessage(R.string.error_xposed_module_missing_desc)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
             }
         }
     }

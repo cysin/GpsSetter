@@ -123,5 +123,7 @@
     <string name="geocoder_proxy_on">activé</string>
     <string name="geocoder_proxy_off">désactivé</string>
     <string name="error_xposed_module_missing">Impossible de confirmer que le module est actif</string>
-    <string name="error_xposed_module_missing_desc">Activez ce module dans votre gestionnaire Xposed (LSPosed, Vector) puis rouvrez l\'application.\n\nS\'il est déjà activé, cette vérification exige que TeleQuant figure dans sa propre portée — c\'est le seul moyen pour le module d\'être chargé dans cette application et de le signaler. La simulation n\'en a pas besoin : le module s\'exclut de ses propres hooks dans tous les cas, donc laisser TeleQuant hors de sa portée ne coûte que ce message.</string>
+    <string name="error_xposed_module_missing_desc">Activez ce module dans votre gestionnaire Xposed (LSPosed, Vector) puis rouvrez l\'application.\n\nS\'il est déjà activé, il peut s\'agir d\'un faux négatif : la vérification suppose que le framework charge le module dans cette application pour qu\'il puisse se signaler. La simulation n\'est pas concernée — le module s\'exclut de ses propres hooks, TeleQuant n\'a donc pas besoin de figurer dans sa propre portée.</string>
+    <string name="module_active">Module actif</string>
+    <string name="module_unconfirmed">Activation non confirmée — appuyez</string>
 </resources>
