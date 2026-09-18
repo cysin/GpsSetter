@@ -72,8 +72,6 @@
     <string name="offline_downloading">Téléchargement des tuiles</string>
     <string name="offline_done">Zone disponible hors ligne</string>
     <string name="offline_failed">Échec du téléchargement : %1$s</string>
-    <string name="tile_proxy">Proxy de tuiles</string>
-    <string name="tile_proxy_summary">Récupérer les tuiles via un proxy HTTP local</string>
     <string name="tile_proxy_host">Hôte du proxy</string>
     <string name="tile_proxy_port">Port du proxy</string>
     <string name="map_category">Carte</string>

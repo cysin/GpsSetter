@@ -4,15 +4,15 @@ import android.content.Context
 import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.utils.PrefManager
 import okhttp3.OkHttpClient
+import java.net.InetSocketAddress
+import java.net.Proxy
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
 import timber.log.Timber
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 /**
- * MapLibre initialisation: styles, the HTTP stack, and the tile proxy.
+ * MapLibre initialisation: styles, the HTTP stack, and offline storage.
  *
  * Must run before any MapView is inflated — [MapLibre.getInstance] is what
  * brings the native renderer up.
@@ -82,13 +82,14 @@ object MapEngine {
     }
 
     /**
-     * MapLibre fetches through OkHttp rather than HttpURLConnection, so the
-     * proxy is installed by replacing its client — osmdroid's
-     * Configuration.setHttpProxy() has no equivalent here.
+     * MapLibre fetches through OkHttp rather than HttpURLConnection, so both the
+     * User-Agent and the proxy are installed by replacing its client.
      *
-     * The proxy must speak HTTP and support CONNECT: the tile endpoints are
-     * HTTPS, and the hop to the proxy itself is plaintext. That is why the
-     * setting is a host and port with no scheme.
+     * Tiles are proxied only if asked. On the network this was measured against,
+     * the tile host answers directly in about 0.7 s and through the proxy in
+     * about 1.2 s — paying double the latency on every tile to route around a
+     * block that is not there. A network that does block it is exactly why the
+     * switch exists.
      */
     fun applyHttpStack() {
         val builder = OkHttpClient.Builder()
@@ -105,9 +106,9 @@ object MapEngine {
                 )
             }
 
-        if (PrefManager.tileProxyEnabled) {
-            val host = PrefManager.tileProxyHost.orEmpty().ifBlank { TileDefaults.HOST }
-            val port = PrefManager.tileProxyPort?.toIntOrNull() ?: TileDefaults.PORT
+        if (PrefManager.proxyTiles) {
+            val host = PrefManager.proxyHost.orEmpty().ifBlank { TileDefaults.HOST }
+            val port = PrefManager.proxyPort?.toIntOrNull() ?: TileDefaults.PORT
             runCatching {
                 builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(host, port)))
             }.onFailure { Timber.tag(TAG).w(it, "proxy $host:$port") }

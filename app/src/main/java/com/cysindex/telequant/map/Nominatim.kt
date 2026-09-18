@@ -19,29 +19,46 @@ import java.util.concurrent.TimeUnit
  * mainland China. The previous code handled the empty result gracefully, so
  * search did not crash; it simply never found anything.
  *
- * Nominatim is plain HTTPS, so it reaches the network through the same proxy
- * the map tiles use.
+ * Proxied independently of the tiles. On the network this was measured
+ * against, the tile host answers directly in well under a second while
+ * Nominatim does not answer at all — which is why the two are separate
+ * switches rather than one.
  */
 object Nominatim {
 
     data class Place(val displayName: String, val lat: Double, val lon: Double)
 
-    private val client: OkHttpClient by lazy { buildClient() }
+    /**
+     * Rebuilt whenever the proxy settings change rather than built once.
+     *
+     * A `by lazy` client meant a changed proxy did nothing until the app was
+     * killed and reopened, with nothing on screen to say so — turning the
+     * setting on and watching search keep failing looks exactly like the
+     * setting being broken.
+     */
+    @Volatile
+    private var cached: Pair<String, OkHttpClient>? = null
 
-    private fun buildClient(): OkHttpClient {
+    private fun client(): OkHttpClient {
+        val enabled = PrefManager.proxyGeocoder
+        val host = PrefManager.proxyHost.orEmpty().ifBlank { MapEngine.TileDefaults.HOST }
+        val port = PrefManager.proxyPort?.toIntOrNull() ?: MapEngine.TileDefaults.PORT
+        val key = "$enabled|$host|$port"
+
+        cached?.let { (cachedKey, cachedClient) -> if (cachedKey == key) return cachedClient }
+
         val builder = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-
-        if (PrefManager.tileProxyEnabled) {
-            val host = PrefManager.tileProxyHost.orEmpty()
-                .ifBlank { MapEngine.TileDefaults.HOST }
-            val port = PrefManager.tileProxyPort?.toIntOrNull() ?: MapEngine.TileDefaults.PORT
+            // Short, because this runs while someone waits for a search box to
+            // answer. A blocked host otherwise burns the full connect timeout
+            // twice over, since OkHttp retries.
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+        if (enabled) {
             runCatching {
                 builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(host, port)))
-            }
+            }.onFailure { Timber.tag(TAG).w(it, "proxy $host:$port") }
         }
-        return builder.build()
+        return builder.build().also { cached = key to it }
     }
 
     /**
@@ -49,9 +66,15 @@ object Nominatim {
      * traffic at roughly one request per second; this app only ever queries on
      * an explicit search, so the rate is not a concern.
      */
-    suspend fun search(query: String, limit: Int = 5): List<Place> = withContext(Dispatchers.IO) {
+    /**
+     * @return the matches, or null when the geocoder could not be reached.
+     *   An empty list and an unreachable server used to be the same value, so
+     *   the UI reported "address not found" for a network that was simply
+     *   blocked — which sends the user looking for a different spelling.
+     */
+    suspend fun search(query: String, limit: Int = 5): List<Place>? = withContext(Dispatchers.IO) {
         val url = "$BASE/search?format=jsonv2&limit=$limit&q=${query.urlEncoded()}"
-        request(url)?.let { parseList(it) }.orEmpty()
+        request(url)?.let { parseList(it) }
     }
 
     suspend fun reverse(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {
@@ -68,7 +91,7 @@ object Nominatim {
             .header("User-Agent", MapEngine.USER_AGENT)
             .header("Accept-Language", java.util.Locale.getDefault().toLanguageTag())
             .build()
-        client.newCall(request).execute().use { response ->
+        client().newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
             response.body?.string()
         }

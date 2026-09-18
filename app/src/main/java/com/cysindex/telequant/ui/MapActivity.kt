@@ -494,7 +494,10 @@ class MapActivity : AppCompatActivity() {
     private fun updateAddressLabel() {
         val label = binding.bottomSheetContainer.firstAddress
         addressJob?.cancel()
-        label.text = getString(R.string.address_looking_up)
+        // Coordinates first, replaced by the name if one arrives. The old
+        // placeholder sat there for the whole connect timeout whenever the
+        // geocoder was unreachable, which reads as a hang.
+        label.text = "%.6f, %.6f".format(lat, lon)
         addressJob = lifecycleScope.launch {
             delay(ADDRESS_DEBOUNCE_MS)
             val requestedLat = lat
@@ -784,15 +787,48 @@ class MapActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            val results = Nominatim.search(normalized)
-            when {
-                results.isEmpty() -> showToast(getString(R.string.address_not_found))
-                results.size == 1 -> results[0].let {
-                    moveTarget(it.lat, it.lon, recentre = true)
+            // Null and empty mean different things: one is "the geocoder never
+            // answered", the other "it answered, and there is no such place".
+            // Reporting both as "not found" sent the user hunting for a
+            // spelling mistake when the request had not left the device.
+            when (val results = Nominatim.search(normalized)) {
+                null -> showGeocoderUnreachable()
+                emptyList<Nominatim.Place>() -> showToast(getString(R.string.address_not_found))
+                else -> if (results.size == 1) {
+                    moveTarget(results[0].lat, results[0].lon, recentre = true)
+                } else {
+                    chooseSearchResult(results)
                 }
-                else -> chooseSearchResult(results)
             }
         }
+    }
+
+    /**
+     * Names the proxy, because that is the setting that fixes this and there is
+     * no way for the user to guess it from "not found".
+     */
+    private fun showGeocoderUnreachable() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.geocoder_unreachable_title)
+            .setMessage(
+                getString(
+                    R.string.geocoder_unreachable_message,
+                    PrefManager.proxyHost.orEmpty()
+                        .ifBlank { MapEngine.TileDefaults.HOST },
+                    PrefManager.proxyPort.orEmpty()
+                        .ifBlank { MapEngine.TileDefaults.PORT.toString() },
+                    if (PrefManager.proxyGeocoder) {
+                        getString(R.string.geocoder_proxy_on)
+                    } else {
+                        getString(R.string.geocoder_proxy_off)
+                    }
+                )
+            )
+            .setPositiveButton(R.string.settings) { _, _ ->
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun chooseSearchResult(results: List<Nominatim.Place>) {

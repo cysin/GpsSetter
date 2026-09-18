@@ -88,12 +88,6 @@
 
     <PreferenceCategory android:title="@string/map_category">
 
-        <rikka.material.preference.MaterialSwitchPreference
-            android:defaultValue="true"
-            android:key="tile_proxy_enabled"
-            android:summary="@string/tile_proxy_summary"
-            android:title="@string/tile_proxy" />
-
         <EditTextPreference
             android:defaultValue="127.0.0.1"
             android:key="tile_proxy_host"
@@ -106,6 +100,18 @@
             android:key="tile_proxy_port"
             android:summary="%s"
             android:title="@string/tile_proxy_port" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="proxy_tiles_enabled"
+            android:summary="@string/proxy_tiles_summary"
+            android:title="@string/proxy_tiles" />
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="true"
+            android:key="geocoder_proxy_enabled"
+            android:summary="@string/proxy_geocoder_summary"
+            android:title="@string/proxy_geocoder" />
 
         <rikka.preference.SimpleMenuPreference
             android:defaultValue="liberty"

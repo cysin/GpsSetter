@@ -38,7 +38,8 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth
                 "spoof_timezone" -> PrefManager.spoofTimeZone
-                "tile_proxy_enabled" -> PrefManager.tileProxyEnabled
+                "proxy_tiles_enabled" -> PrefManager.proxyTiles
+                "geocoder_proxy_enabled" -> PrefManager.proxyGeocoder
                 "offline_map" -> PrefManager.offlineMap
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
@@ -51,10 +52,13 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi = value
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth = value
                 "spoof_timezone" -> PrefManager.spoofTimeZone = value
-                "tile_proxy_enabled" -> {
-                    PrefManager.tileProxyEnabled = value
+                "proxy_tiles_enabled" -> {
+                    PrefManager.proxyTiles = value
+                    // Takes effect now rather than on next launch.
                     MapEngine.applyHttpStack()
                 }
+
+                "geocoder_proxy_enabled" -> PrefManager.proxyGeocoder = value
                 "offline_map" -> {
                     PrefManager.offlineMap = value
                     // Takes effect immediately rather than on next launch.
@@ -70,8 +74,8 @@ class SettingsActivity : AppCompatActivity() {
                 "darkTheme" -> PrefManager.darkTheme.toString()
                 "jitter_radius" -> PrefManager.jitterRadius
                 "jitter_mode" -> PrefManager.jitterMode
-                "tile_proxy_host" -> PrefManager.tileProxyHost
-                "tile_proxy_port" -> PrefManager.tileProxyPort
+                "tile_proxy_host" -> PrefManager.proxyHost
+                "tile_proxy_port" -> PrefManager.proxyPort
                 "map_style" -> PrefManager.mapStyle
                 else -> throw IllegalArgumentException("Invalid key $key")
             }
@@ -83,8 +87,8 @@ class SettingsActivity : AppCompatActivity() {
                 "darkTheme" -> PrefManager.darkTheme = value!!.toInt()
                 "jitter_radius" -> PrefManager.jitterRadius = value
                 "jitter_mode" -> PrefManager.jitterMode = value
-                "tile_proxy_host" -> PrefManager.tileProxyHost = value
-                "tile_proxy_port" -> PrefManager.tileProxyPort = value
+                "tile_proxy_host" -> PrefManager.proxyHost = value
+                "tile_proxy_port" -> PrefManager.proxyPort = value
                 "map_style" -> PrefManager.mapStyle = value
                 else -> throw IllegalArgumentException("Invalid key $key")
             }

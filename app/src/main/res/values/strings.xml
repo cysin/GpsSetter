@@ -71,9 +71,12 @@
     <string name="offline_downloading">Downloading tiles</string>
     <string name="offline_done">Area available offline</string>
     <string name="offline_failed">Download failed: %1$s</string>
-    <string name="tile_proxy">Tile proxy</string>
-    <string name="tile_proxy_summary">Fetch map tiles through a local HTTP proxy</string>
+    
     <string name="tile_proxy_host">Proxy host</string>
+    <string name="proxy_tiles">Proxy map tiles</string>
+    <string name="proxy_tiles_summary">Off is usually right: the tile host is normally reachable directly, and measurably faster that way.</string>
+    <string name="proxy_geocoder">Proxy place search</string>
+    <string name="proxy_geocoder_summary">Place search and address lookup go to nominatim.openstreetmap.org, which many networks block.</string>
     <string name="tile_proxy_port">Proxy port</string>
     <string name="map_category">Map</string>
 
@@ -123,4 +126,8 @@
     <string name="favourite_badge_full">%1$d cells · %2$d Wi-Fi · %3$d beacons</string>
     <string name="favourite_badge_position">Coordinate only</string>
     <string name="test_env_place_name">Test environment (synthetic)</string>
+    <string name="geocoder_unreachable_title">Could not reach the search service</string>
+    <string name="geocoder_unreachable_message">The request to nominatim.openstreetmap.org did not get through, so this is not a spelling problem.\n\nProxy for place search is %3$s (%1$s:%2$s). Map tiles have their own switch and are unaffected.</string>
+    <string name="geocoder_proxy_on">on</string>
+    <string name="geocoder_proxy_off">off</string>
 </resources>

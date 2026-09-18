@@ -33,7 +33,11 @@ object PrefManager   {
     private const val SPOOF_BLUETOOTH = "spoof_bluetooth"
     private const val SPOOF_TIMEZONE = "spoof_timezone"
     private const val ACTIVE_ENVIRONMENT = "active_environment"
-    private const val TILE_PROXY_ENABLED = "tile_proxy_enabled"
+    // A fresh key rather than the old combined one. That key's stored value
+    // meant "proxy everything", so reusing it would hand everyone who had the
+    // proxy on the tile setting measured to be the slower of the two.
+    private const val PROXY_TILES = "proxy_tiles_enabled"
+    private const val GEOCODER_PROXY_ENABLED = "geocoder_proxy_enabled"
     private const val TILE_PROXY_HOST = "tile_proxy_host"
     private const val TILE_PROXY_PORT = "tile_proxy_port"
     private const val OFFLINE_MAP = "offline_map"
@@ -134,16 +138,29 @@ object PrefManager   {
         get() = pref.getString(ACTIVE_ENVIRONMENT, null)
         set(value) { pref.edit().putString(ACTIVE_ENVIRONMENT, value).apply() }
 
-    /** Route tile downloads through a local HTTP (CONNECT) proxy. */
-    var tileProxyEnabled: Boolean
-        get() = pref.getBoolean(TILE_PROXY_ENABLED, true)
-        set(value) = pref.edit().putBoolean(TILE_PROXY_ENABLED, value).apply()
+    /**
+     * One proxy, chosen per destination.
+     *
+     * Which hosts need it is a property of the network, not of the app, and the
+     * two destinations measured differently on the same connection: the tile
+     * host answers directly in about 0.7 s and through the proxy in about 1.2 s,
+     * while Nominatim does not answer directly at all. So the defaults are off
+     * for tiles and on for geocoding — but both are the user's to change, since
+     * another network will block a different set.
+     */
+    var proxyTiles: Boolean
+        get() = pref.getBoolean(PROXY_TILES, false)
+        set(value) = pref.edit().putBoolean(PROXY_TILES, value).apply()
 
-    var tileProxyHost: String?
+    var proxyGeocoder: Boolean
+        get() = pref.getBoolean(GEOCODER_PROXY_ENABLED, true)
+        set(value) = pref.edit().putBoolean(GEOCODER_PROXY_ENABLED, value).apply()
+
+    var proxyHost: String?
         get() = pref.getString(TILE_PROXY_HOST, "127.0.0.1")
         set(value) { pref.edit().putString(TILE_PROXY_HOST, value).apply() }
 
-    var tileProxyPort: String?
+    var proxyPort: String?
         get() = pref.getString(TILE_PROXY_PORT, "33009")
         set(value) { pref.edit().putString(TILE_PROXY_PORT, value).apply() }
 
