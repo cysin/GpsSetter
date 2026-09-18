@@ -67,8 +67,13 @@ object LocationFactory {
         } else {
             @Suppress("DEPRECATION")
             runCatching { location.removeAltitude() }
-            @Suppress("DEPRECATION")
-            runCatching { location.removeVerticalAccuracy() }
+            // API 33. Below that, removeAltitude() has already cleared the
+            // altitude, and a vertical accuracy without one is not a
+            // combination anything reads.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                runCatching { location.removeVerticalAccuracy() }
+            }
         }
     }
 

@@ -109,7 +109,14 @@ class EnvironmentRecorder(private val context: Context) {
         }
     }
 
+    // The guard below is the check; lint only recognises an inline
+    // checkSelfPermission, not the helper the rest of this file uses.
+    @SuppressLint("MissingPermission")
     private suspend fun captureSatellites(): List<SatelliteRecord> {
+        // Checked rather than assumed: without it the registration throws a
+        // SecurityException that runCatching swallows, which looks exactly like
+        // a sky with no satellites in it.
+        if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) return emptyList()
         if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) return emptyList()
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: return emptyList()

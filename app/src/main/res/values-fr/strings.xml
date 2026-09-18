@@ -73,6 +73,10 @@
     <string name="offline_done">Zone disponible hors ligne</string>
     <string name="offline_failed">Échec du téléchargement : %1$s</string>
     <string name="tile_proxy_host">Hôte du proxy</string>
+    <string name="proxy_tiles">Proxy pour les tuiles</string>
+    <string name="proxy_tiles_summary">À laisser désactivé en général : l\'hôte des tuiles est normalement joignable en direct, et plus rapide ainsi.</string>
+    <string name="proxy_geocoder">Proxy pour la recherche de lieux</string>
+    <string name="proxy_geocoder_summary">La recherche de lieux et le géocodage inverse passent par nominatim.openstreetmap.org, bloqué sur de nombreux réseaux.</string>
     <string name="tile_proxy_port">Port du proxy</string>
     <string name="map_category">Carte</string>
     <string name="map_style">Style de carte</string>
@@ -91,4 +95,36 @@
     <string name="test_env_message">Remplace les données radio par %1$d cellules, %2$d points d’accès et %3$d balises n’appartenant à aucun réseau réel — opérateur %4$s, SSID commençant par %5$s.\n\nPour vérifier que les hooks s’appliquent : un enregistrement de ce téléphone contient ses propres antennes réelles et ne permet donc pas de distinguer une lecture interceptée. La position ne change pas.</string>
     <string name="test_env_apply">Charger</string>
     <string name="test_env_applied">Environnement de test chargé</string>
+
+    <!-- repères sur la carte -->
+    <string name="marker_active">Simulation ici</string>
+    <string name="marker_selection_real">Position de l\'appareil</string>
+    <string name="marker_selection_manual">Point choisi</string>
+    <string name="locating">Lecture de la position réelle…</string>
+
+    <string name="self_spoof_title">Cette lecture n\'est peut-être pas réelle</string>
+    <string name="self_spoof_message">La position qui vient d\'être lue correspond au point simulé. Cette application est normalement exclue de ses propres hooks, ce qui veut dire en général qu\'elle a été ajoutée à sa propre portée dans le gestionnaire Xposed. Retirez-la de cette portée, ou considérez cette lecture comme la valeur simulée plutôt que votre position réelle.</string>
+
+    <string name="mode_title">Que simuler</string>
+    <string name="mode_full_option">Position et environnement enregistré (%1$d cellules, %2$d Wi-Fi, %3$d balises)</string>
+    <string name="mode_position_option">Position seule — l\'opérateur reste réel, les identifiants de cellules et de points d\'accès sont fabriqués, de sorte qu\'une recherche ne trouve rien et que l\'application retombe sur le GNSS</string>
+    <string name="start">Démarrer</string>
+
+    <string name="favourite_name_hint">Nom de ce lieu</string>
+    <string name="favourite_record">Enregistrer aussi les cellules, le Wi-Fi et les balises d\'ici</string>
+    <string name="favourite_record_note">Enregistré là où vous êtes, associé à la coordonnée ci-dessus.</string>
+    <string name="selection_from_fix">D\'après la position de l\'appareil (précision %1$d m)</string>
+    <string name="selection_from_map">Choisi sur la carte</string>
+    <string name="selection_distance">%1$s de la position de l\'appareil</string>
+    <string name="selection_distance_unknown">Position de l\'appareil inconnue — appuyez sur le bouton de localisation pour comparer</string>
+    <string name="favourite_loaded_full">Chargé avec %1$d cellules, %2$d Wi-Fi, %3$d balises</string>
+    <string name="favourite_loaded_position">Chargé — coordonnée seule</string>
+    <string name="favourite_badge_full">%1$d cellules · %2$d Wi-Fi · %3$d balises</string>
+    <string name="favourite_badge_position">Coordonnée seule</string>
+    <string name="test_env_place_name">Environnement de test (synthétique)</string>
+
+    <string name="geocoder_unreachable_title">Service de recherche injoignable</string>
+    <string name="geocoder_unreachable_message">La requête vers nominatim.openstreetmap.org n\'a pas abouti : il ne s\'agit donc pas d\'une faute d\'orthographe.\n\nLe proxy pour la recherche est %3$s (%1$s:%2$s). Les tuiles ne sont pas concernées : elles ont leur propre réglage.</string>
+    <string name="geocoder_proxy_on">activé</string>
+    <string name="geocoder_proxy_off">désactivé</string>
 </resources>
