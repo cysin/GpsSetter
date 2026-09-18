@@ -81,7 +81,7 @@ class JitterEngine(
         // clipping; clipping would make the boundary a visible attractor.
         val dist = hypot(east, north)
         if (dist > radiusMeters && dist > 0.0) {
-            val scale = (2 * radiusMeters - dist) / dist
+            val scale = foldIntoRadius(dist) / dist
             east *= scale
             north *= scale
         }
@@ -95,6 +95,22 @@ class JitterEngine(
         }
 
         return Sample(east, north, lastSpeed, lastBearing)
+    }
+
+    /**
+     * Maps a distance of any size into `[0, radiusMeters]` by reflecting off the
+     * boundary as many times as it takes.
+     *
+     * Reflecting once — `2r - d` — only works while the step is shorter than two
+     * radii. Driving mode over a long polling interval steps further than that,
+     * and the single reflection then landed the walk back outside: a 3 m radius
+     * was observed 14 m out. Folding is the same bounce repeated, so distances
+     * between one and two radii behave exactly as they did.
+     */
+    private fun foldIntoRadius(distance: Double): Double {
+        val period = 2 * radiusMeters
+        val wrapped = distance.mod(period)
+        return if (wrapped <= radiusMeters) wrapped else period - wrapped
     }
 
     companion object {
