@@ -3,6 +3,8 @@ package com.cysindex.telequant.audit
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult as BleScanResult
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -18,6 +20,7 @@ import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
 import android.telephony.TelephonyManager
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -218,7 +221,70 @@ class SignalAuditActivity : AppCompatActivity() {
         row("adapter", if (adapter == null) "null" else "enabled=${adapter.isEnabled}")
         val bonded = runCatching { adapter?.bondedDevices }.getOrNull()
         row("getBondedDevices", "${bonded?.size ?: 0} devices")
-        row("LE scan", "start one from a scanner app and watch logcat for spoofed results")
+
+        leScanRow = row("BLE startScan", "tap the button below to run a 6s scan")
+        container.addView(Button(this).apply {
+            text = "Run BLE scan (6s)"
+            setOnClickListener { runLeScan(adapter) }
+        })
+    }
+
+    private var leScanRow: TextView? = null
+
+    /**
+     * Actually performs a scan rather than telling the reader to run one
+     * elsewhere. This is the only probe that needs a live callback: every other
+     * signal can be read synchronously, but ScanCallback results only arrive
+     * once the radio reports something.
+     */
+    @SuppressLint("MissingPermission")
+    private fun runLeScan(adapter: android.bluetooth.BluetoothAdapter?) {
+        val scanner = adapter?.bluetoothLeScanner
+        if (scanner == null) {
+            leScanRow?.text = "BLE startScan\n    scanner unavailable (adapter off?)"
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !granted(Manifest.permission.BLUETOOTH_SCAN)
+        ) {
+            leScanRow?.text = "BLE startScan\n    SKIPPED — no BLUETOOTH_SCAN permission"
+            return
+        }
+
+        val seen = LinkedHashMap<String, String>()
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: BleScanResult?) {
+                val r = result ?: return
+                val address = runCatching { r.device.address }.getOrNull() ?: return
+                val name = runCatching { r.device.name }.getOrNull() ?: "—"
+                seen[address] = "$name  $address  ${r.rssi}dBm"
+                render(seen, scanning = true)
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                leScanRow?.text = "BLE startScan\n    failed, error $errorCode"
+            }
+        }
+
+        leScanRow?.text = "BLE startScan\n    scanning…"
+        runCatching { scanner.startScan(callback) }
+            .onFailure {
+                leScanRow?.text = "BLE startScan\n    threw: $it"
+                return
+            }
+
+        container.postDelayed({
+            runCatching { scanner.stopScan(callback) }
+            render(seen, scanning = false)
+        }, 6_000)
+    }
+
+    private fun render(seen: Map<String, String>, scanning: Boolean) {
+        val header = if (scanning) "scanning…" else "finished"
+        leScanRow?.text = buildString {
+            append("BLE startScan\n    $header — ${seen.size} devices")
+            seen.values.take(8).forEach { append("\n      ").append(it) }
+        }
     }
 
     private fun auditConsistency() {
@@ -243,12 +309,14 @@ class SignalAuditActivity : AppCompatActivity() {
         })
     }
 
-    private fun row(label: String, value: String) {
-        container.addView(TextView(this).apply {
+    private fun row(label: String, value: String): TextView {
+        val view = TextView(this).apply {
             text = "$label\n    $value"
             textSize = 12f
             setTextIsSelectable(true)
             setPadding(0, 4, 0, 4)
-        })
+        }
+        container.addView(view)
+        return view
     }
 }

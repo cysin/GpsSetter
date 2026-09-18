@@ -4,9 +4,12 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.cysindex.telequant.spoof.BeaconRecord
 import com.cysindex.telequant.xposed.core.SpoofEngine
@@ -18,6 +21,9 @@ import com.highcapable.yukihookapi.hook.factory.toClass
 import com.highcapable.yukihookapi.hook.log.YLog
 import com.highcapable.yukihookapi.hook.type.java.BooleanType
 import com.highcapable.yukihookapi.hook.type.java.StringClass
+import java.lang.ref.WeakReference
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * Tier B: Bluetooth. This had no coverage at all before, so beacon-based
@@ -41,69 +47,143 @@ object BluetoothHooks : YukiBaseHooker() {
         SpoofEngine.current().takeIf { it.enabled }
 
     /**
-     * Wraps the app's [ScanCallback] so results are replaced with the recorded
-     * beacons, delivered on whatever thread the framework already uses for it.
+     * Swaps the app's [ScanCallback] for one that hides the genuine devices and
+     * reports the recorded beacons instead.
      */
     private fun hookLeScanner() {
         val className = "android.bluetooth.le.BluetoothLeScanner"
         if (!className.hasClass()) return
 
         className.toClass().apply {
-            if (!hasMethod { name = "startScan" }) return@apply
-            method { name = "startScan" }.hookAll {
-                before {
-                    val snapshot = snapshot() ?: return@before
-                    if (!snapshot.hasBeacons) return@before
+            if (hasMethod { name = "startScan" }) {
+                method { name = "startScan" }.hookAll {
+                    before {
+                        val snapshot = snapshot() ?: return@before
+                        if (!snapshot.hasBeacons) return@before
 
-                    val index = args.indexOfFirst { it is ScanCallback }
-                    if (index < 0) return@before
-                    val original = args[index] as ScanCallback
-                    args[index] = SpoofingScanCallback(original)
+                        val index = args.indexOfFirst { it is ScanCallback }
+                        if (index < 0) return@before
+                        args[index] = BeaconEmitter.attach(args[index] as ScanCallback)
+                    }
+                }
+            }
+            // The framework keys its scan registry on the object startScan was
+            // given, which is the wrapper — so an app stopping its own callback
+            // matches nothing and the scan runs until the process dies. Translate
+            // the argument back to whatever was substituted for it.
+            if (hasMethod { name = "stopScan" }) {
+                method { name = "stopScan" }.hookAll {
+                    before {
+                        val index = args.indexOfFirst { it is ScanCallback }
+                        if (index < 0) return@before
+                        val wrapper = BeaconEmitter.detach(args[index] as ScanCallback)
+                        if (wrapper != null) args[index] = wrapper
+                    }
                 }
             }
         }
     }
 
-    private class SpoofingScanCallback(
-        private val delegate: ScanCallback
-    ) : ScanCallback() {
+    /**
+     * Drives beacon delivery on a timer instead of rewriting genuine results as
+     * they arrive.
+     *
+     * Rewriting was not enough: a result only arrives when something real is
+     * advertising nearby, so an app scanning in a quiet room saw nothing at all
+     * and concluded there were no beacons — the recording was invisible exactly
+     * where beacon positioning matters most. The emitter is now the only source
+     * and genuine results are dropped.
+     *
+     * Delivery is posted to the main looper because that is where the platform's
+     * own scan callbacks land.
+     */
+    private object BeaconEmitter {
 
-        override fun onScanResult(callbackType: Int, result: ScanResult?) {
-            val snapshot = SpoofEngine.current()
-            if (!snapshot.enabled || !snapshot.hasBeacons) {
-                delegate.onScanResult(callbackType, result)
-                return
+        private const val INTERVAL_MS = 1_000L
+
+        private val handler = Handler(Looper.getMainLooper())
+
+        /**
+         * Weak on both sides. The key is the app's callback, which this module
+         * must not keep alive; the value would pin it through an ordinary strong
+         * field, so the wrapper holds it weakly too and the scan stops on its own
+         * once the app has let go. The framework holds the wrapper for as long as
+         * the scan is registered.
+         */
+        private val wrappers =
+            Collections.synchronizedMap(WeakHashMap<ScanCallback, Wrapper>())
+
+        fun attach(original: ScanCallback): ScanCallback =
+            synchronized(wrappers) {
+                wrappers.getOrPut(original) { Wrapper(original) }
+            }.also { it.start() }
+
+        fun detach(original: ScanCallback): ScanCallback? =
+            synchronized(wrappers) { wrappers.remove(original) }?.also { it.stop() }
+
+        private class Wrapper(delegate: ScanCallback) : ScanCallback() {
+
+            private val delegateRef = WeakReference(delegate)
+
+            @Volatile
+            private var running = false
+
+            private val tick = object : Runnable {
+                override fun run() {
+                    val target = delegateRef.get()
+                    if (target == null) {
+                        stop()
+                        return
+                    }
+                    val snapshot = SpoofEngine.current()
+                    if (snapshot.enabled && snapshot.hasBeacons) {
+                        snapshot.beacons.forEach { beacon ->
+                            build(beacon)?.let {
+                                target.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it)
+                            }
+                        }
+                    }
+                    handler.postDelayed(this, INTERVAL_MS)
+                }
             }
-            // Use the real result as a template so every field we do not
-            // override keeps a shape the platform actually produces.
-            val template = result ?: return
-            snapshot.beacons.forEach { beacon ->
-                buildResult(template, beacon)?.let { delegate.onScanResult(callbackType, it) }
+
+            fun start() {
+                if (running) return
+                running = true
+                handler.post(tick)
             }
+
+            fun stop() {
+                running = false
+                handler.removeCallbacks(tick)
+            }
+
+            // Genuine results are suppressed while spoofing: one real device in
+            // a list that is otherwise the recording contradicts every other
+            // signal the module reports.
+            override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                if (!spoofing()) delegateRef.get()?.onScanResult(callbackType, result)
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>?) {
+                if (!spoofing()) delegateRef.get()?.onBatchScanResults(results)
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                delegateRef.get()?.onScanFailed(errorCode)
+            }
+
+            private fun spoofing(): Boolean =
+                SpoofEngine.current().let { it.enabled && it.hasBeacons }
         }
 
-        override fun onBatchScanResults(results: MutableList<ScanResult>?) {
-            val snapshot = SpoofEngine.current()
-            if (!snapshot.enabled || !snapshot.hasBeacons) {
-                delegate.onBatchScanResults(results)
-                return
-            }
-            val template = results?.firstOrNull() ?: return
-            val spoofed = snapshot.beacons.mapNotNull { buildResult(template, it) }
-            delegate.onBatchScanResults(spoofed.toMutableList())
-        }
-
-        override fun onScanFailed(errorCode: Int) = delegate.onScanFailed(errorCode)
-
-        private fun buildResult(template: ScanResult, beacon: BeaconRecord): ScanResult? =
+        private fun build(beacon: BeaconRecord): ScanResult? =
             runCatching {
                 // getRemoteDevice is public API and accepts an arbitrary MAC.
                 val device: BluetoothDevice = BluetoothAdapter.getDefaultAdapter()
                     .getRemoteDevice(beacon.address)
 
-                val record = beacon.scanRecordHex
-                    ?.let { hex -> parseScanRecord(hex.hexToBytes()) }
-                    ?: template.scanRecord
+                val bytes = beacon.scanRecordHex?.hexToBytes() ?: synthesiseAdvertisement(beacon)
 
                 // The legacy four-argument constructor, rather than the extended
                 // one: that needs an eventType, which ScanResult exposes no
@@ -111,11 +191,35 @@ object BluetoothHooks : YukiBaseHooker() {
                 // the framework pick the legacy-advertisement value itself.
                 ScanResult(
                     device,
-                    record,
+                    parseScanRecord(bytes),
                     beacon.rssi,
                     SystemClock.elapsedRealtimeNanos()
                 )
             }.onFailure { YLog.warn("beacon build failed: $it") }.getOrNull()
+
+        /**
+         * A minimal advertisement for a beacon that was never recorded off the
+         * air — a synthesised profile, say. Recorded beacons keep their original
+         * bytes; this is only the fallback, and it carries nothing but flags, TX
+         * power and the name so that it stays a frame a real device could send.
+         */
+        private fun synthesiseAdvertisement(beacon: BeaconRecord): ByteArray {
+            val out = ArrayList<Byte>(MAX_ADVERTISEMENT)
+            // Flags: LE General Discoverable, BR/EDR not supported.
+            out.add(2); out.add(0x01); out.add(0x06)
+            out.add(2); out.add(0x0A); out.add(beacon.txPower.toByte())
+            beacon.name?.encodeToByteArray()
+                ?.take(MAX_ADVERTISEMENT - out.size - 2)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { name ->
+                    out.add((name.size + 1).toByte())
+                    out.add(0x09) // Complete Local Name
+                    out.addAll(name)
+                }
+            return out.toByteArray()
+        }
+
+        private const val MAX_ADVERTISEMENT = 31
 
         /** ScanRecord.parseFromBytes is hidden but stable across versions. */
         private fun parseScanRecord(bytes: ByteArray): android.bluetooth.le.ScanRecord? =
@@ -208,8 +312,19 @@ object BluetoothHooks : YukiBaseHooker() {
             if (hasMethod { name = "getName"; emptyParam(); returnType = StringClass }) {
                 method { name = "getName"; emptyParam(); returnType = StringClass }.hook {
                     before {
-                        val beacon = snapshot()?.beacons?.firstOrNull() ?: return@before
-                        beacon.name?.let { result = it }
+                        val beacons = snapshot()?.beacons ?: return@before
+                        if (beacons.isEmpty()) return@before
+                        val address = (instance as? BluetoothDevice)?.address
+                        // Answer for the address being asked about. Returning the
+                        // first beacon's name for every device made four results
+                        // with four MACs all report one name, which no real scan
+                        // produces. An address the recording does not contain
+                        // belongs to a genuine device that reached the app some
+                        // other way, and stays anonymous rather than leaking its
+                        // real name — an unnamed device is ordinary.
+                        result = beacons
+                            .firstOrNull { it.address.equals(address, ignoreCase = true) }
+                            ?.name
                     }
                 }
             }

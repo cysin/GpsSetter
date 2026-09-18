@@ -1,4 +1,0 @@
-#Fri Sep 18 09:27:21 SGT 2026
-base.0=/home/star/work/GpsSetter/audit/build/intermediates/dex/release/mergeDexRelease/classes.dex
-renamed.0=classes.dex
-path.0=classes.dex
