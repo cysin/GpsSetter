@@ -2,6 +2,7 @@ package com.cysindex.telequant.xposed.hooks
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
@@ -40,6 +41,7 @@ object BluetoothHooks : YukiBaseHooker() {
         hookLeScanner()
         hookDiscovery()
         hookFoundBroadcast()
+        hookScanBroadcast()
         hookDeviceIdentity()
     }
 
@@ -177,7 +179,7 @@ object BluetoothHooks : YukiBaseHooker() {
                 SpoofEngine.current().let { it.enabled && it.hasBeacons }
         }
 
-        private fun build(beacon: BeaconRecord): ScanResult? =
+        fun build(beacon: BeaconRecord): ScanResult? =
             runCatching {
                 // getRemoteDevice is public API and accepts an arbitrary MAC.
                 val device: BluetoothDevice = BluetoothAdapter.getDefaultAdapter()
@@ -274,6 +276,30 @@ object BluetoothHooks : YukiBaseHooker() {
                     // Only receivers that actually asked for device discovery.
                     if (filter?.hasAction(BluetoothDevice.ACTION_FOUND) != true) return@before
                     hookReceiverClass(receiver.javaClass)
+                }
+            }
+        }
+    }
+
+    /**
+     * The `startScan(filters, settings, PendingIntent)` overload, which carries
+     * no [ScanCallback] for [hookLeScanner] to substitute — results arrive as a
+     * broadcast holding the list instead.
+     *
+     * The receiver cannot be caught the way [hookFoundBroadcast] catches one:
+     * the intent's action belongs to the app's own PendingIntent, so there is
+     * nothing to match on. Reading the extra is the one step every consumer of
+     * this path must take, whatever it does afterwards.
+     */
+    private fun hookScanBroadcast() {
+        "android.content.Intent".toClass().apply {
+            if (!hasMethod { name = "getParcelableArrayListExtra" }) return@apply
+            method { name = "getParcelableArrayListExtra" }.hookAll {
+                after {
+                    if (args.firstOrNull() != BluetoothLeScanner.EXTRA_LIST_SCAN_RESULT) return@after
+                    val snapshot = snapshot() ?: return@after
+                    if (!snapshot.hasBeacons) return@after
+                    result = ArrayList(snapshot.beacons.mapNotNull { BeaconEmitter.build(it) })
                 }
             }
         }

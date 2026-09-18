@@ -146,6 +146,23 @@ class SignalAuditActivity : AppCompatActivity() {
         row("getNetworkCountryIso", tm.networkCountryIso.orEmpty().ifEmpty { "(empty)" })
         row("getSimCountryIso", tm.simCountryIso.orEmpty().ifEmpty { "(empty)" })
 
+        // ServiceState carries its own copy of the carrier identity. It went
+        // unrewritten for a long time, so this row disagreeing with the ones
+        // above is the specific thing it is here to catch.
+        val state = runCatching { tm.serviceState }.getOrNull()
+        row(
+            "getServiceState",
+            state?.let {
+                "${it.operatorAlphaLong} / ${it.operatorNumeric}  state=${it.state}  roaming=${it.roaming}"
+            } ?: "null"
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val plmns = state?.networkRegistrationInfoList
+                ?.mapNotNull { it.registeredPlmn?.ifEmpty { null } }
+                ?.distinct()
+            row("  └ registeredPlmn", plmns?.joinToString().orEmpty().ifEmpty { "(none)" })
+        }
+
         if (!granted(Manifest.permission.ACCESS_FINE_LOCATION)) {
             row("getAllCellInfo", "SKIPPED — no permission")
             return
@@ -155,7 +172,38 @@ class SignalAuditActivity : AppCompatActivity() {
             row("getAllCellInfo", "empty (no service, or nothing to rewrite)")
             return
         }
-        infos.take(4).forEach { info -> row("cell", describeCell(info)) }
+        row("getAllCellInfo", "${infos.size} cells")
+        infos.take(6).forEach { info -> row("cell", describeCell(info)) }
+
+        // The push path. Apps on API 31+ register for these rather than polling,
+        // and it used to deliver the real neighbour set untouched.
+        registerForCellInfo(tm)
+    }
+
+    /**
+     * Asks for a cell update through the callback path and prints what arrives.
+     * Pull and push are separate hooks, so a working pull says nothing about it.
+     */
+    @SuppressLint("MissingPermission")
+    private fun registerForCellInfo(tm: TelephonyManager) {
+        val pushed = row("requestCellInfoUpdate", "waiting…")
+        runCatching {
+            tm.requestCellInfoUpdate(
+                mainExecutor,
+                object : TelephonyManager.CellInfoCallback() {
+                    override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
+                        pushed.text = buildString {
+                            append("requestCellInfoUpdate\n    ${cellInfo.size} cells")
+                            cellInfo.take(6).forEach { append("\n      ${describeCell(it)}") }
+                        }
+                    }
+
+                    override fun onError(errorCode: Int, detail: Throwable?) {
+                        pushed.text = "requestCellInfoUpdate\n    error $errorCode"
+                    }
+                }
+            )
+        }.onFailure { pushed.text = "requestCellInfoUpdate\n    threw: $it" }
     }
 
     private fun describeCell(info: CellInfo): String = runCatching {

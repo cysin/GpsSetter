@@ -3,6 +3,7 @@ package com.cysindex.telequant.xposed.hooks
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
 import com.cysindex.telequant.spoof.WifiRecord
+import com.cysindex.telequant.xposed.core.CellFactory
 import com.cysindex.telequant.xposed.core.SpoofEngine
 import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
 import com.highcapable.yukihookapi.hook.factory.hasClass
@@ -14,6 +15,7 @@ import com.highcapable.yukihookapi.hook.type.java.BooleanType
 import com.highcapable.yukihookapi.hook.type.java.IntType
 import com.highcapable.yukihookapi.hook.type.java.ListClass
 import com.highcapable.yukihookapi.hook.type.java.StringClass
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 /**
  * Tier B: Wi-Fi, the signal most "GPS-free" positioning actually runs on.
@@ -83,17 +85,24 @@ object WifiHooks : YukiBaseHooker() {
     /**
      * Clones real [ScanResult] objects and overwrites their fields rather than
      * constructing new ones: the public constructors are hidden and their
-     * signatures move between API levels. When there is no real result to clone
-     * we have nothing to build from, which is the documented fallback gap.
+     * signatures move between API levels, so a copy keeps whatever the platform
+     * put in the fields this does not set.
+     *
+     * With nothing to clone — Wi-Fi switched off, or genuinely no access point
+     * in range — one is constructed instead. Returning the real (empty) list
+     * there used to mean the recording was invisible in exactly the situation
+     * where an app has no other access points to fall back on.
      */
     private fun buildScanResults(
         real: List<ScanResult>,
         records: List<WifiRecord>
     ): List<ScanResult> {
-        val template = real.firstOrNull() ?: return real
+        val template = real.firstOrNull()
         val out = ArrayList<ScanResult>(records.size)
         records.forEach { record ->
-            val copy = runCatching { ScanResult(template) }.getOrNull() ?: return@forEach
+            val copy = template?.let { runCatching { ScanResult(it) }.getOrNull() }
+                ?: construct()
+                ?: return@forEach
             runCatching {
                 copy.BSSID = record.bssid
                 @Suppress("DEPRECATION")
@@ -107,6 +116,19 @@ object WifiHooks : YukiBaseHooker() {
         }
         return if (out.isEmpty()) real else out
     }
+
+    /**
+     * A blank [ScanResult] through the constructor the platform hides. Every
+     * field this module cares about is public on the class, so the object only
+     * has to exist.
+     */
+    private fun construct(): ScanResult? = runCatching {
+        CellFactory.ensureExemptions()
+        val clazz = ScanResult::class.java
+        runCatching {
+            clazz.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+        }.getOrNull() ?: HiddenApiBypass.newInstance(clazz) as? ScanResult
+    }.onFailure { YLog.warn("ScanResult construction failed: $it") }.getOrNull()
 
     /** ScanResult.timestamp is microseconds since boot, not epoch millis. */
     private fun SystemClockMicros(): Long = android.os.SystemClock.elapsedRealtime() * 1000
