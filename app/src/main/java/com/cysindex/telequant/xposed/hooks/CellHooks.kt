@@ -101,6 +101,72 @@ object CellHooks : YukiBaseHooker() {
             clazz.hookCellString("getMncString") { it.mnc?.let { m -> "%02d".format(m) } }
             clazz.hookCellString("getOperatorAlphaLong") { it.operatorLong }
             clazz.hookCellString("getOperatorAlphaShort") { it.operatorShort }
+
+            // Getters alone are not enough, for the same reason they were not
+            // enough on Location: CellIdentity.toString() reads the backing
+            // fields directly, so a hooked getter leaves the string form still
+            // naming the real tower and operator. Anything logging or
+            // serialising the object — including dumpsys — sees through it, and
+            // the object then contradicts the operator strings that *were*
+            // rewritten. Rewrite the fields themselves whenever one is handed
+            // out.
+            clazz.hookFieldRewrite("toString")
+            clazz.hookFieldRewrite("hashCode")
+        }
+    }
+
+    /**
+     * Overwrites the private fields of a CellIdentity in place, just before a
+     * method that exposes them runs.
+     */
+    private fun Class<*>.hookFieldRewrite(methodName: String) {
+        if (!hasMethod { name = methodName; emptyParam() }) return
+        method { name = methodName; emptyParam() }.hook {
+            before { instance?.let { rewriteIdentityFields(it) } }
+        }
+    }
+
+    /** Field names are stable across the CellIdentity subclasses. */
+    private fun rewriteIdentityFields(identity: Any) {
+        val cell = primaryCell() ?: return
+        runCatching {
+            identity.setPrivate("mMccStr", cell.mcc?.let { "%03d".format(it) })
+            identity.setPrivate("mMncStr", cell.mnc?.let { "%02d".format(it) })
+            identity.setPrivate("mAlphaLong", cell.operatorLong)
+            identity.setPrivate("mAlphaShort", cell.operatorShort)
+            cell.tacOrLac()?.let {
+                identity.setPrivate("mTac", it)
+                identity.setPrivate("mLac", it)
+            }
+            cell.pci?.let { identity.setPrivate("mPci", it) }
+            cell.arfcn?.let {
+                identity.setPrivate("mNrArfcn", it)
+                identity.setPrivate("mEarfcn", it)
+                identity.setPrivate("mArfcn", it)
+            }
+            cell.cid?.let {
+                identity.setPrivate("mNci", it)
+                identity.setPrivate("mCi", it.toInt())
+                identity.setPrivate("mCid", it.toInt())
+            }
+        }
+    }
+
+    /** Walks the hierarchy: the fields live on CellIdentity's subclasses. */
+    private fun Any.setPrivate(fieldName: String, value: Any?) {
+        var c: Class<*>? = javaClass
+        while (c != null) {
+            val f = runCatching { c!!.getDeclaredField(fieldName) }.getOrNull()
+            if (f != null) {
+                runCatching {
+                    f.isAccessible = true
+                    // A null here means "leave the real value"; clearing a field
+                    // the recording did not capture would be worse than keeping it.
+                    if (value != null) f.set(this, value)
+                }
+                return
+            }
+            c = c.superclass
         }
     }
 
