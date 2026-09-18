@@ -33,6 +33,14 @@ data class FakeEnvironment(
     val timeZoneId: String? = null,
     val recordedAt: Long = 0L
 ) {
+    /**
+     * Whether the recording actually obtained a position. Exactly 0,0 means the
+     * GPS capture timed out — a real fix at Null Island is not a case worth
+     * supporting, and treating the placeholder as real silently relocates the
+     * user's chosen point.
+     */
+    fun hasFix(): Boolean = lat != 0.0 || lng != 0.0
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("lat", lat)
         put("lng", lng)

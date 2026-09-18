@@ -41,6 +41,7 @@ import com.cysindex.telequant.map.MapEngine
 import com.cysindex.telequant.map.Nominatim
 import com.cysindex.telequant.map.OfflineRegions
 import com.cysindex.telequant.record.EnvironmentRecorder
+import com.cysindex.telequant.spoof.TestEnvironment
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
 import com.cysindex.telequant.utils.NotificationsChannel
 import com.cysindex.telequant.utils.PrefManager
@@ -497,6 +498,8 @@ class MapActivity : AppCompatActivity() {
             val id = it.itemId
             if (id == R.id.record_environment) {
                 recordEnvironment()
+            } else if (id == R.id.load_test_env) {
+                loadTestEnvironment()
             } else if (id == R.id.offline_map) {
                 downloadCurrentArea()
             } else if (id == R.id.get_favourite) {
@@ -721,7 +724,17 @@ class MapActivity : AppCompatActivity() {
     }
 
     private fun showRecordingResult(result: EnvironmentRecorder.Result) {
-        val env = result.environment
+        // Indoors the GPS capture usually times out, but the cells, Wi-Fi and
+        // beacons are still real. Rather than discard a good radio recording for
+        // want of a coordinate, bind it to the point currently chosen on the
+        // map — which is exactly the "pick it by hand" fallback the user wants.
+        val env = if (result.environment.hasFix()) {
+            result.environment
+        } else {
+            result.environment.copy(lat = lat, lng = lon)
+        }
+        val usedMapPoint = !result.environment.hasFix()
+
         val summary = buildString {
             append(
                 getString(
@@ -733,6 +746,10 @@ class MapActivity : AppCompatActivity() {
                 append("\n\n").append(getString(R.string.recording_missing))
                 result.missing.forEach { append("\n  • ").append(it) }
             }
+            if (usedMapPoint) {
+                append("\n\n")
+                    .append(getString(R.string.recording_used_map_point, env.lat, env.lng))
+            }
         }
 
         MaterialAlertDialogBuilder(this)
@@ -740,12 +757,39 @@ class MapActivity : AppCompatActivity() {
             .setMessage(summary)
             .setPositiveButton(R.string.recording_use) { _, _ ->
                 PrefManager.activeEnvironment = env.toJson().toString()
-                if (env.lat != 0.0 || env.lng != 0.0) {
-                    moveTarget(env.lat, env.lng, recentre = true)
-                }
+                moveTarget(env.lat, env.lng, recentre = true)
                 showToast(getString(R.string.recording_applied))
             }
             .setNegativeButton(R.string.recording_discard, null)
+            .show()
+    }
+
+    /**
+     * Loads an obviously-synthetic environment, for checking that the cell,
+     * Wi-Fi and Bluetooth hooks actually fire.
+     *
+     * A recording made on this phone cannot answer that question: it contains
+     * this phone's real towers, so a hooked read and an unhooked one look
+     * identical. These values belong to no real network, so seeing them proves
+     * the read went through the hooks.
+     */
+    private fun loadTestEnvironment() {
+        val env = TestEnvironment.build(lat, lon)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.test_env)
+            .setMessage(
+                getString(
+                    R.string.test_env_message,
+                    env.cells.size, env.wifis.size, env.beacons.size,
+                    TestEnvironment.OPERATOR, TestEnvironment.SSID_PREFIX
+                )
+            )
+            .setPositiveButton(R.string.test_env_apply) { _, _ ->
+                PrefManager.activeEnvironment = env.toJson().toString()
+                redrawTarget()
+                showToast(getString(R.string.test_env_applied))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 

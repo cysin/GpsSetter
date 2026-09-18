@@ -47,8 +47,7 @@ class SignalAuditActivity : AppCompatActivity() {
         }
         // Without these every probe reports SKIPPED, which looks like the hooks
         // failing rather than the auditor never having asked.
-        requestPermissions(
-            buildList {
+        val needed = buildList {
                 add(Manifest.permission.ACCESS_FINE_LOCATION)
                 add(Manifest.permission.ACCESS_COARSE_LOCATION)
                 add(Manifest.permission.READ_PHONE_STATE)
@@ -59,11 +58,12 @@ class SignalAuditActivity : AppCompatActivity() {
                     add(Manifest.permission.BLUETOOTH_SCAN)
                     add(Manifest.permission.BLUETOOTH_CONNECT)
                 }
-            }.filter {
-                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-            }.toTypedArray(),
-            1
-        )
+        }.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+        // requestPermissions throws on an empty array, which is exactly the case
+        // once everything has already been granted.
+        if (needed.isNotEmpty()) requestPermissions(needed, 1)
 
         setContentView(ScrollView(this).apply {
             addView(

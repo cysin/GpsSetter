@@ -12,6 +12,12 @@
         android:icon="@drawable/ic_accuracy"/>
 
     <item
+        android:id="@+id/load_test_env"
+        android:title="@string/test_env"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_random_position"/>
+
+    <item
         android:id="@+id/offline_map"
         android:title="@string/offline_download"
         app:showAsAction="always"

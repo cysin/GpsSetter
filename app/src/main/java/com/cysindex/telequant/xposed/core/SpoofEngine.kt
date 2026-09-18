@@ -101,8 +101,13 @@ object SpoofEngine {
         // A recorded environment carries its own coordinates; a bare point
         // comes from the map. The recorded one wins when present so that the
         // radio data and the position describe the same place.
-        val anchorLat = env?.lat ?: PrefsBridge.anchorLat
-        val anchorLng = env?.lng ?: PrefsBridge.anchorLng
+        // A recording made indoors often has no GPS fix, in which case its
+        // coordinates are 0,0 rather than absent. Taking that literally would
+        // silently move the anchor into the Gulf of Guinea and throw away the
+        // point the user chose, so only a recording that actually got a fix is
+        // allowed to override it.
+        val anchorLat = env?.lat?.takeIf { env.hasFix() } ?: PrefsBridge.anchorLat
+        val anchorLng = env?.lng?.takeIf { env.hasFix() } ?: PrefsBridge.anchorLng
 
         val radius = PrefsBridge.jitterRadiusMeters
         val mode = runCatching { JitterEngine.Mode.valueOf(PrefsBridge.jitterMode) }
