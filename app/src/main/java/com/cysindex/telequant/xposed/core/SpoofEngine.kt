@@ -138,7 +138,11 @@ object SpoofEngine {
             lat = lat,
             lng = lng,
             altitude = env?.altitude ?: 0.0,
-            accuracy = env?.accuracy ?: PrefsBridge.accuracy,
+            // The setting, not the environment. The recorder no longer reads a
+            // position, so a recording's accuracy is a placeholder rather than
+            // a measurement, and preferring it left the settings value with no
+            // effect at all.
+            accuracy = PrefsBridge.accuracy,
             speedMps = sample.speedMps,
             bearingDeg = sample.bearingDeg,
             // Never leave this at 0: consumers treat elapsedRealtimeNanos as the

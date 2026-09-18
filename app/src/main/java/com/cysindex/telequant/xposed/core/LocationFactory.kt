@@ -34,7 +34,7 @@ object LocationFactory {
         location.latitude = snapshot.lat
         location.longitude = snapshot.lng
         location.accuracy = snapshot.accuracy
-        location.altitude = snapshot.altitude
+        applyAltitude(location, snapshot)
         location.speed = snapshot.speedMps
         location.bearing = snapshot.bearingDeg
         location.time = snapshot.timeMillis
@@ -45,11 +45,31 @@ object LocationFactory {
 
         location.speedAccuracyMetersPerSecond = 0.35f
         location.bearingAccuracyDegrees = 12f
-        location.verticalAccuracyMeters = snapshot.accuracy * 1.6f
 
         clearMockMarkers(location)
         rewriteExtras(location, snapshot)
         return true
+    }
+
+    /**
+     * Reports an altitude only when the environment actually carries one.
+     *
+     * Since the recorder stopped reading a position it has no altitude to
+     * record, so this was setting exactly 0.0 — and Location.setAltitude also
+     * raises hasAltitude(), so every fix claimed to be a measurement taken at
+     * sea level wherever in the world it was. No altitude at all is ordinary;
+     * sea level everywhere is not.
+     */
+    private fun applyAltitude(location: Location, snapshot: SpoofEngine.Snapshot) {
+        if (snapshot.altitude != 0.0) {
+            location.altitude = snapshot.altitude
+            location.verticalAccuracyMeters = snapshot.accuracy * 1.6f
+        } else {
+            @Suppress("DEPRECATION")
+            runCatching { location.removeAltitude() }
+            @Suppress("DEPRECATION")
+            runCatching { location.removeVerticalAccuracy() }
+        }
     }
 
     private fun clearMockMarkers(location: Location) {
@@ -78,7 +98,7 @@ object LocationFactory {
                 inner.latitude = snapshot.lat
                 inner.longitude = snapshot.lng
                 inner.accuracy = snapshot.accuracy
-                inner.altitude = snapshot.altitude
+                applyAltitude(inner, snapshot)
                 inner.time = snapshot.timeMillis
                 inner.elapsedRealtimeNanos = snapshot.elapsedRealtimeNanos
                 extras.putParcelable(EXTRA_NO_GPS_LOCATION, inner)

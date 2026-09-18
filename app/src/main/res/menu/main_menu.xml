@@ -2,15 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-
-
-
-    <item
-        android:id="@+id/load_test_env"
-        android:title="@string/test_env"
-        app:showAsAction="always"
-        android:icon="@drawable/ic_random_position"/>
-
     <item
         android:id="@+id/offline_map"
         android:title="@string/offline_download"
@@ -34,7 +25,5 @@
         android:title="@string/about"
         app:showAsAction="always"
         android:icon="@drawable/ic_outline_info_24"/>
-
-
 
 </menu>

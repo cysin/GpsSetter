@@ -210,10 +210,11 @@ class MapActivity : AppCompatActivity() {
                 updateAddressLabel()
             }
 
-            // Long press rather than tap: a tap cannot be told apart from the
-            // start of a pan, so tapping to place meant nudging the target
-            // constantly while navigating.
-            map.addOnMapLongClickListener { point ->
+            // A single tap places the point. The worry that this would fight
+            // with panning does not hold: MapLibre reports a *confirmed* single
+            // tap, which neither a pan (a scroll gesture) nor a double-tap zoom
+            // (the second tap cancels the confirmation) produces.
+            map.addOnMapClickListener { point ->
                 moveTarget(point.latitude, point.longitude, recentre = false)
                 true
             }
@@ -742,9 +743,7 @@ class MapActivity : AppCompatActivity() {
             // AGP 9 compiles apps against non-final R fields, so resource ids can
             // no longer appear in `when` branches.
             val id = it.itemId
-            if (id == R.id.load_test_env) {
-                loadTestEnvironment()
-            } else if (id == R.id.offline_map) {
+            if (id == R.id.offline_map) {
                 downloadCurrentArea()
             } else if (id == R.id.get_favourite) {
                 openFavouriteListDialog()
@@ -955,8 +954,16 @@ class MapActivity : AppCompatActivity() {
         }
         favListAdapter.onItemDelete = { viewModel.deleteFavourite(it) }
         alertDialog.setView(view)
+        // A verification tool rather than an everyday one, so it lives here
+        // instead of the main menu — but it stays reachable in release builds,
+        // which is what actually gets installed, and it saves the profile as a
+        // place so it replays through the same path as everything else.
+        alertDialog.setNeutralButton(R.string.test_env, null)
         dialog = alertDialog.create()
         dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+            loadTestEnvironment()
+        }
     }
 
     private fun getAllUpdatedFavList() {
@@ -1151,6 +1158,7 @@ class MapActivity : AppCompatActivity() {
             )
             .setPositiveButton(R.string.test_env_apply) { _, _ ->
                 selectedEnvironment = env
+                saveFavourite(getString(R.string.test_env), env)
                 redrawTarget()
                 reapplyIfRunning()
                 showToast(getString(R.string.test_env_applied))
