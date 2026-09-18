@@ -122,4 +122,5 @@
     <string name="favourite_loaded_position">Loaded — coordinate only</string>
     <string name="favourite_badge_full">%1$d cells · %2$d Wi-Fi · %3$d beacons</string>
     <string name="favourite_badge_position">Coordinate only</string>
+    <string name="test_env_place_name">Test environment (synthetic)</string>
 </resources>

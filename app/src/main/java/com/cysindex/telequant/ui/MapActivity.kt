@@ -1158,7 +1158,7 @@ class MapActivity : AppCompatActivity() {
             )
             .setPositiveButton(R.string.test_env_apply) { _, _ ->
                 selectedEnvironment = env
-                saveFavourite(getString(R.string.test_env), env)
+                saveFavourite(getString(R.string.test_env_place_name), env)
                 redrawTarget()
                 reapplyIfRunning()
                 showToast(getString(R.string.test_env_applied))
