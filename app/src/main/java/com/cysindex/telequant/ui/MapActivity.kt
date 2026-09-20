@@ -143,13 +143,19 @@ class MapActivity : AppCompatActivity() {
      * half-empty environment.
      */
     private val requestRecordingPermissions =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            // Resume whichever flow asked. Without this a save-with-recording
-            // came back from the permission prompt as a bare recording, and the
-            // name the user had just typed was gone.
-            pendingFavouriteLabel?.let {
-                pendingFavouriteLabel = null
-                recordThenSave(it)
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+            val label = pendingFavouriteLabel ?: return@registerForActivityResult
+            pendingFavouriteLabel = null
+            // Go straight to recording with whatever was granted rather than
+            // back through the permission check. Re-checking sent a refusal
+            // straight back into launch(), and once Android stops showing the
+            // prompt for a permission denied twice, that was a tight loop with
+            // no UI in it at all.
+            if (granted.values.any { it }) {
+                recordNow(label)
+            } else {
+                showToast(getString(R.string.recording_no_permissions))
+                saveFavourite(label, null)
             }
         }
 
@@ -541,6 +547,12 @@ class MapActivity : AppCompatActivity() {
         lat = newLat
         lon = newLon
         selectionOrigin = origin
+        // The environment belonged to the point that was just left. Carrying
+        // it along meant loading "Office", tapping a park, and having Start
+        // offer to replay the office's towers there — a contradictory
+        // environment produced by nothing more than a tap. Loading a favourite
+        // reattaches its own after this returns.
+        selectedEnvironment = null
         if (recentre) {
             mapLibre?.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), DEFAULT_ZOOM)
@@ -1006,6 +1018,11 @@ class MapActivity : AppCompatActivity() {
             requestRecordingPermissions.launch(missing)
             return
         }
+        recordNow(label)
+    }
+
+    /** Records with the permissions currently held; the recorder reports what it lacked. */
+    private fun recordNow(label: String) {
         val progress = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.recording_title)
             .setMessage(R.string.recording_message)
@@ -1036,19 +1053,15 @@ class MapActivity : AppCompatActivity() {
     }
 
     private fun saveFavourite(label: String, environment: FakeEnvironment?) {
-        viewModel.storeFavorite(
-            address = label,
-            lat = lat,
-            lon = lon,
-            environment = environment?.toJson()?.toString(),
-            capturedAt = if (environment != null) System.currentTimeMillis() else 0L
-        )
-        viewModel.response.observe(this@MapActivity) {
-            if (it == (-1).toLong()) {
-                showToast(getString(R.string.cant_save))
-            } else {
-                showToast(getString(R.string.save))
-            }
+        lifecycleScope.launch {
+            val id = viewModel.storeFavorite(
+                address = label,
+                lat = lat,
+                lon = lon,
+                environment = environment?.toJson()?.toString(),
+                capturedAt = if (environment != null) System.currentTimeMillis() else 0L
+            )
+            showToast(getString(if (id == -1L) R.string.cant_save else R.string.save))
         }
     }
 

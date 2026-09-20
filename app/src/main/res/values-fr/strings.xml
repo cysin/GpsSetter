@@ -4,7 +4,6 @@
 
     <string name="app_name">Régulateur GPS</string>
     <string name="xposed_desc">Définir localisation</string>
-    <string name="search">Rechercher</string>
     <string name="save">sauvegarder</string>
     <string name="address">Etats Unis</string>
     <string name="favourites">Favoris</string>
@@ -48,7 +47,6 @@
     <string name="stop">Arrêter</string>
     <string name="start_spoofing">Définir la position</string>
     <string name="jitter_radius">Rayon de variation</string>
-    <string name="jitter_radius_summary">Mètres sur lesquels la position signalée peut varier. 0 la fixe exactement.</string>
     <string name="jitter_mode">Type de déplacement</string>
     <string name="signals">Signaux</string>
     <string name="spoof_cell">Antennes-relais</string>
@@ -88,7 +86,6 @@
     <string name="jitter_radius_fixed">Fixe — la position ne bouge jamais</string>
     <string name="jitter_radius_value">Varie jusqu\'à %1$d m autour du point</string>
     <string name="favourites_empty">Aucun lieu enregistré.\nAppuyez sur l\'étoile pour en ajouter un.</string>
-    <string name="recording_keeps_anchor">Aucune position capturée : les données radio seront rejouées au point déjà défini sur la carte.</string>
     <string name="test_env">Charger un environnement de test</string>
     <string name="test_env_message">Remplace les données radio par %1$d cellules, %2$d points d’accès et %3$d balises n’appartenant à aucun réseau réel — opérateur %4$s, SSID commençant par %5$s.\n\nPour vérifier que les hooks s’appliquent : un enregistrement de ce téléphone contient ses propres antennes réelles et ne permet donc pas de distinguer une lecture interceptée. La position ne change pas.</string>
     <string name="test_env_apply">Charger</string>
@@ -126,4 +123,5 @@
     <string name="error_xposed_module_missing_desc">Activez ce module dans votre gestionnaire Xposed (LSPosed, Vector) puis rouvrez l\'application.\n\nS\'il est déjà activé, il peut s\'agir d\'un faux négatif : la vérification suppose que le framework charge le module dans cette application pour qu\'il puisse se signaler. La simulation n\'est pas concernée — le module s\'exclut de ses propres hooks, TeleQuant n\'a donc pas besoin de figurer dans sa propre portée.</string>
     <string name="module_active">Module actif</string>
     <string name="module_unconfirmed">Activation non confirmée — appuyez</string>
+    <string name="recording_no_permissions">Aucune permission accordée — coordonnée seule enregistrée</string>
 </resources>
