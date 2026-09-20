@@ -135,4 +135,7 @@
         <item quantity="one">%d balise</item>
         <item quantity="other">%d balises</item>
     </plurals>
+    <string name="marker_candidate">Résultat de recherche</string>
+    <string name="search_found">Trouvé : %1$s</string>
+    <string name="search_use">Utiliser ce point</string>
 </resources>
