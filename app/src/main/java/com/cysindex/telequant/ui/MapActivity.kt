@@ -7,17 +7,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.drawable.GradientDrawable
 import android.location.Location
-import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
-import android.os.CancellationSignal
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.view.View
@@ -35,7 +29,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -47,16 +43,18 @@ import com.cysindex.telequant.adapter.FavListAdapter
 import com.cysindex.telequant.databinding.ActivityMapBinding
 import com.cysindex.telequant.map.MapEngine
 import com.cysindex.telequant.map.Nominatim
-import com.cysindex.telequant.map.OfflineRegions
 import com.cysindex.telequant.record.EnvironmentRecorder
 import com.cysindex.telequant.spoof.FakeEnvironment
 import com.cysindex.telequant.spoof.JitterEngine
 import com.cysindex.telequant.spoof.SyntheticEnvironment
 import com.cysindex.telequant.spoof.TestEnvironment
+import com.cysindex.telequant.ui.map.MapMarkers
+import com.cysindex.telequant.ui.map.OfflineDownloadUi
 import com.cysindex.telequant.ui.viewmodel.MainViewModel
 import com.cysindex.telequant.utils.NotificationsChannel
 import com.cysindex.telequant.utils.PrefManager
 import com.cysindex.telequant.utils.ext.isNetworkConnected
+import com.cysindex.telequant.utils.ext.radioSummary
 import com.cysindex.telequant.utils.ext.showToast
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.MaterialColors
@@ -71,17 +69,6 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.FillLayer
-import org.maplibre.android.style.layers.LineLayer
-import org.maplibre.android.style.layers.Property
-import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.Point
-import org.maplibre.geojson.Polygon
 import java.util.regex.Pattern
 import kotlin.properties.Delegates
 
@@ -128,6 +115,10 @@ class MapActivity : AppCompatActivity() {
     private lateinit var dialog: AlertDialog
 
     private val elevationOverlayProvider by lazy { ElevationOverlayProvider(this) }
+
+    private val markers by lazy {
+        MapMarkers(this, MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary))
+    }
 
     /**
      * POST_NOTIFICATIONS is a runtime permission since Android 13; without it the
@@ -211,7 +202,7 @@ class MapActivity : AppCompatActivity() {
             map.setStyle(MapEngine.styleUrl()) { loaded ->
                 style = loaded
                 // Sources and layers can only be added once the style is loaded.
-                installTargetLayers(loaded)
+                markers.install(loaded)
                 redrawTarget()
                 startLiveFix()
                 updateAddressLabel()
@@ -228,208 +219,15 @@ class MapActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Installs the layers the two markers are drawn with.
-     *
-     * Core style layers rather than the annotation plugin: the newest plugin
-     * (3.0.2) is built against MapLibre 11.3.0 and would be force-upgraded two
-     * major versions to 13.6.1 here. That compiles but could break at runtime,
-     * which is the one thing that cannot be checked from a build machine.
-     *
-     * Two markers, because they answer different questions. The selection is
-     * where the next Start would put you; the active marker is where apps are
-     * being told you are *right now*. They coincide most of the time, and the
-     * moment they stop coinciding — picking a new place without restarting, or
-     * panning away from a running simulation — is exactly when one marker
-     * cannot say which is which.
-     */
-    private fun installTargetLayers(loaded: Style) {
-        loaded.addSource(GeoJsonSource(SOURCE_SELECTION))
-        loaded.addSource(GeoJsonSource(SOURCE_ACTIVE))
-        loaded.addSource(GeoJsonSource(SOURCE_LIVE))
-        loaded.addSource(GeoJsonSource(SOURCE_JITTER))
-
-        val accent = MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary)
-
-        // The jitter ring belongs to the active marker: it is the area apps are
-        // actually being given, not a property of a place under consideration.
-        loaded.addLayer(
-            FillLayer(LAYER_JITTER_FILL, SOURCE_JITTER).withProperties(
-                PropertyFactory.fillColor(COLOR_ACTIVE),
-                PropertyFactory.fillOpacity(0.16f)
-            )
-        )
-        loaded.addLayer(
-            LineLayer(LAYER_JITTER_LINE, SOURCE_JITTER).withProperties(
-                PropertyFactory.lineColor(COLOR_ACTIVE),
-                PropertyFactory.lineWidth(1.5f)
-            )
-        )
-
-        // Icons rather than CircleLayer: a CircleLayer on these same sources
-        // draws nothing here — verified with a 40 px magenta circle that never
-        // appeared while the fill and line layers above it rendered fine. The
-        // style's own POI markers are symbol icons, which is the path that
-        // demonstrably works.
-        loaded.addImage(IMAGE_SELECTION, markerPin(Color.WHITE, accent))
-        loaded.addImage(IMAGE_ACTIVE, markerDot(COLOR_ACTIVE))
-        loaded.addImage(IMAGE_LIVE, liveDot(COLOR_ACTIVE))
-
-        // Different shape *and* different colour. One of the two alone survives
-        // neither a colour-blind user nor a greyscale screenshot.
-        loaded.addLayer(
-            SymbolLayer(LAYER_SELECTION, SOURCE_SELECTION).withProperties(
-                PropertyFactory.iconImage(IMAGE_SELECTION),
-                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true),
-                PropertyFactory.textField(Expression.get(PROP_LABEL)),
-                PropertyFactory.textFont(MAP_FONT),
-                PropertyFactory.textSize(11f),
-                PropertyFactory.textOffset(arrayOf(0f, 0.6f)),
-                PropertyFactory.textAnchor(Property.TEXT_ANCHOR_TOP),
-                PropertyFactory.textHaloWidth(1.6f),
-                PropertyFactory.textHaloColor(Color.WHITE),
-                PropertyFactory.textColor(accent),
-                PropertyFactory.textAllowOverlap(true),
-                // The icon is the marker; losing the glyphs must not lose it.
-                PropertyFactory.textOptional(true)
-            )
-        )
-        loaded.addLayer(
-            SymbolLayer(LAYER_ACTIVE, SOURCE_ACTIVE).withProperties(
-                PropertyFactory.iconImage(IMAGE_ACTIVE),
-                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true),
-                PropertyFactory.textField(Expression.get(PROP_LABEL)),
-                PropertyFactory.textFont(MAP_FONT),
-                PropertyFactory.textSize(11f),
-                PropertyFactory.textOffset(arrayOf(0f, 1.6f)),
-                PropertyFactory.textAnchor(Property.TEXT_ANCHOR_TOP),
-                PropertyFactory.textHaloWidth(1.6f),
-                PropertyFactory.textHaloColor(Color.WHITE),
-                PropertyFactory.textColor(COLOR_ACTIVE),
-                PropertyFactory.textAllowOverlap(true),
-                PropertyFactory.textOptional(true)
-            )
-        )
-
-        // The wandering fix itself. Drawn above the anchor so it stays readable
-        // when the two coincide, which they do whenever the radius is 0.
-        loaded.addLayer(
-            SymbolLayer(LAYER_LIVE, SOURCE_LIVE).withProperties(
-                PropertyFactory.iconImage(IMAGE_LIVE),
-                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true)
-            )
-        )
-    }
-
-    /**
-     * A hollow pin for the selection: an outline reads as "under consideration"
-     * next to the filled dot of something already running, and the teardrop
-     * points at a spot while the dot marks one.
-     */
-    private fun markerPin(fill: Int, stroke: Int): Bitmap {
-        val d = resources.displayMetrics.density
-        val width = (28 * d).toInt()
-        val height = (40 * d).toInt()
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val radius = width / 2f
-        val silhouette = Path().apply {
-            addCircle(radius, radius, radius, Path.Direction.CW)
-            moveTo(radius - radius * 0.62f, radius + radius * 0.66f)
-            lineTo(radius, height.toFloat())
-            lineTo(radius + radius * 0.62f, radius + radius * 0.66f)
-            close()
-        }
-        // Silhouette first, then the interior punched out of it, so the two
-        // shapes meet without a seam down the join.
-        paint.color = stroke
-        canvas.drawPath(silhouette, paint)
-        paint.color = fill
-        canvas.drawCircle(radius, radius, radius - 3.5f * d, paint)
-        return bitmap
-    }
-
-    /**
-     * The live fix: small, solid, no halo — it has to read as a moving point
-     * rather than a second anchor.
-     */
-    private fun liveDot(fill: Int): Bitmap {
-        val d = resources.displayMetrics.density
-        val size = (16 * d).toInt()
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val centre = size / 2f
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = Color.WHITE
-        canvas.drawCircle(centre, centre, 6f * d, paint)
-        paint.color = fill
-        canvas.drawCircle(centre, centre, 4f * d, paint)
-        return bitmap
-    }
-
-    /** A filled dot with a soft halo for the position being simulated. */
-    private fun markerDot(fill: Int): Bitmap {
-        val d = resources.displayMetrics.density
-        val size = (44 * d).toInt()
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val centre = size / 2f
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = ColorUtils.setAlphaComponent(fill, 55)
-        canvas.drawCircle(centre, centre, centre, paint)
-        paint.color = Color.WHITE
-        canvas.drawCircle(centre, centre, 11f * d, paint)
-        paint.color = fill
-        canvas.drawCircle(centre, centre, 8f * d, paint)
-        return bitmap
-    }
-
     /** Redraws both markers and the jitter ring. */
     private fun redrawTarget() {
         val loaded = style ?: return
-        val selectionSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_SELECTION) ?: return
-        val activeSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_ACTIVE) ?: return
-        val jitterSource = loaded.getSourceAs<GeoJsonSource>(SOURCE_JITTER) ?: return
-
-        // Drawn whether or not spoofing is running: the marker is how the user
-        // sees where they just long-pressed, and hiding it until the start
-        // button was pressed meant placing a target produced no feedback at all.
-        selectionSource.setGeoJson(
-            Feature.fromGeometry(Point.fromLngLat(lon, lat)).apply {
-                addStringProperty(PROP_LABEL, selectionLabel())
-            }
-        )
-
-        // The active marker is the one the user asked to appear only while
-        // something is actually being simulated.
-        val active = activePosition()
-        activeSource.setGeoJson(
-            FeatureCollection.fromFeatures(
-                if (active == null) emptyList() else listOf(
-                    Feature.fromGeometry(Point.fromLngLat(active.second, active.first)).apply {
-                        addStringProperty(PROP_LABEL, getString(R.string.marker_active))
-                    }
-                )
-            )
-        )
-
-        val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
-        // Both branches must be the same type, or no setGeoJson overload matches.
-        jitterSource.setGeoJson(
-            FeatureCollection.fromFeatures(
-                if (active != null && radius > 0) {
-                    listOf(jitterPolygon(active.first, active.second, radius))
-                } else {
-                    emptyList()
-                }
-            )
+        markers.draw(
+            loaded,
+            selection = MapMarkers.LatLon(lat, lon),
+            selectionLabel = selectionLabel(),
+            active = activePosition(),
+            radiusMetres = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
         )
     }
 
@@ -459,27 +257,21 @@ class MapActivity : AppCompatActivity() {
     }
 
     private fun drawLiveFix() {
-        val source = style?.getSourceAs<GeoJsonSource>(SOURCE_LIVE) ?: return
-        val anchor = activePosition()
-        val features = if (anchor == null) {
-            emptyList()
-        } else {
-            val radius = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0
-            val mode = runCatching {
-                JitterEngine.Mode.valueOf(PrefManager.jitterMode.orEmpty())
-            }.getOrDefault(JitterEngine.Mode.STATIONARY)
-            val sample = JitterEngine.sample(radius, mode, System.currentTimeMillis())
-            val (fixLat, fixLng) = JitterEngine.offset(
-                anchor.first, anchor.second, sample.dEastMeters, sample.dNorthMeters
-            )
-            listOf(Feature.fromGeometry(Point.fromLngLat(fixLng, fixLat)))
-        }
-        source.setGeoJson(FeatureCollection.fromFeatures(features))
+        val loaded = style ?: return
+        val mode = runCatching {
+            JitterEngine.Mode.valueOf(PrefManager.jitterMode.orEmpty())
+        }.getOrDefault(JitterEngine.Mode.STATIONARY)
+        markers.drawLive(
+            loaded,
+            active = activePosition(),
+            radiusMetres = PrefManager.jitterRadius?.toDoubleOrNull() ?: 0.0,
+            mode = mode
+        )
     }
 
     /** The position currently being fed to apps, or null when stopped. */
-    private fun activePosition(): Pair<Double, Double>? =
-        if (spoofing) PrefManager.getLat to PrefManager.getLng else null
+    private fun activePosition(): MapMarkers.LatLon? =
+        if (spoofing) MapMarkers.LatLon(PrefManager.getLat, PrefManager.getLng) else null
 
     private fun selectionLabel(): String {
         val origin = when (selectionOrigin) {
@@ -513,29 +305,6 @@ class MapActivity : AppCompatActivity() {
                 label.text = name ?: "%.6f, %.6f".format(lat, lon)
             }
         }
-    }
-
-    /**
-     * The jitter area as a geographic polygon rather than a pixel-radius
-     * circle, so it keeps matching the real radius at every zoom without being
-     * recomputed on each camera move.
-     */
-    private fun jitterPolygon(
-        centreLat: Double,
-        centreLon: Double,
-        radiusMetres: Double
-    ): Feature {
-        val ring = (0..CIRCLE_SEGMENTS).map { i ->
-            val angle = 2.0 * Math.PI * i / CIRCLE_SEGMENTS
-            val dEast = Math.cos(angle) * radiusMetres
-            val dNorth = Math.sin(angle) * radiusMetres
-            val dLat = Math.toDegrees(dNorth / EARTH_RADIUS_M)
-            val dLon = Math.toDegrees(
-                dEast / (EARTH_RADIUS_M * Math.cos(Math.toRadians(centreLat)))
-            )
-            Point.fromLngLat(centreLon + dLon, centreLat + dLat)
-        }
-        return Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
     }
 
     private fun moveTarget(
@@ -640,10 +409,7 @@ class MapActivity : AppCompatActivity() {
             return
         }
         val options = arrayOf(
-            getString(
-                R.string.mode_full_option,
-                environment.cells.size, environment.wifis.size, environment.beacons.size
-            ),
+            getString(R.string.mode_full_option, radioSummary(environment)),
             getString(R.string.mode_position_option)
         )
         var chosen = 0
@@ -712,6 +478,28 @@ class MapActivity : AppCompatActivity() {
             if (spoofing) View.GONE else View.VISIBLE
         binding.bottomSheetContainer.stopButton.visibility =
             if (spoofing) View.VISIBLE else View.GONE
+        updateModeLabel()
+    }
+
+    /**
+     * Says which of the two modes is running. Without it the only visible
+     * difference between "position only" and "full environment" was which
+     * dialog option had been tapped some time ago.
+     */
+    private fun updateModeLabel() {
+        val label = binding.bottomSheetContainer.modeLabel
+        if (!spoofing) {
+            label.visibility = View.GONE
+            return
+        }
+        // recordedAt == 0 marks the environment this app synthesised itself.
+        val active = FakeEnvironment.parse(PrefManager.activeEnvironment)
+        label.text = if (active != null && active.recordedAt != 0L) {
+            getString(R.string.mode_running_full, radioSummary(active))
+        } else {
+            getString(R.string.mode_running_position)
+        }
+        label.visibility = View.VISIBLE
     }
 
     private fun setDrawer() {
@@ -735,20 +523,34 @@ class MapActivity : AppCompatActivity() {
 
     private fun setBottomSheet() {
         val bottom = BottomSheetBehavior.from(binding.bottomSheetContainer.bottomSheet)
-        binding.bottomSheetContainer.search.searchBox.setOnEditorActionListener { v, actionId, _ ->
+        val searchBox = binding.bottomSheetContainer.search.searchBox
+        val clear = binding.bottomSheetContainer.search.searchClear
+        clear.setOnClickListener {
+            searchBox.text?.clear()
+            searchBox.requestFocus()
+        }
+        // Only there while there is something to clear; a permanent × next to
+        // an empty field is a control that does nothing.
+        searchBox.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                clear.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
+        searchBox.setOnEditorActionListener { v, actionId, _ ->
             if (actionId != EditorInfo.IME_ACTION_SEARCH) return@setOnEditorActionListener false
             val input = v.text.toString()
             if (input.isNotEmpty()) search(input)
             true
         }
 
-        binding.mapContainer.setOnApplyWindowInsetsListener { _, insets ->
-            @Suppress("DEPRECATION")
-            val topInset: Int = insets.systemWindowInsetTop
-            @Suppress("DEPRECATION")
-            val bottomInset: Int = insets.systemWindowInsetBottom
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mapContainer) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
             bottom.peekHeight =
-                binding.bottomSheetContainer.searchLayout.measuredHeight + bottomInset
+                binding.bottomSheetContainer.searchLayout.measuredHeight + bars.bottom
 
             val searchParams =
                 binding.bottomSheetContainer.searchLayout.layoutParams as MarginLayoutParams
@@ -756,15 +558,35 @@ class MapActivity : AppCompatActivity() {
             // appears. Adding to the current margin each time walked the search
             // box down the screen, so base it on the value from the layout.
             if (baseSearchBottomMargin < 0) baseSearchBottomMargin = searchParams.bottomMargin
-            searchParams.bottomMargin = baseSearchBottomMargin + bottomInset
-            binding.navView.setPadding(0, topInset, 0, 0)
+            searchParams.bottomMargin = baseSearchBottomMargin + bars.bottom
+            binding.navView.setPadding(0, bars.top, 0, 0)
 
-            @Suppress("DEPRECATION")
-            insets.consumeSystemWindowInsets()
+            // Make room for the keyboard by shrinking the sheet's parent. With
+            // decorFitsSystemWindows off the window does not resize for the
+            // IME, the manifest asks for adjustNothing so the system does not
+            // pan the window either, and BottomSheetBehavior places the sheet
+            // by its parent's *height* — so a bottom margin on the parent is
+            // what moves it. Padding the parent moved nothing, and a
+            // translation on the sheet was reset by the next layout pass.
+            // The deprecated systemWindowInsetBottom this used to read does not
+            // include the IME on API 30+ at all, which is why the keyboard
+            // covered the search box and whatever was typed was typed blind.
+            val lift = (ime.bottom - bars.bottom).coerceAtLeast(0)
+            (binding.coordinator.layoutParams as MarginLayoutParams).let { lp ->
+                if (lp.bottomMargin != lift) {
+                    lp.bottomMargin = lift
+                    binding.coordinator.layoutParams = lp
+                }
+            }
+
+            // Consumed, as before: passed through, the parent layouts also make
+            // room for the keyboard and the sheet ends up lifted twice.
+            WindowInsetsCompat.CONSUMED
         }
 
         bottom.state = BottomSheetBehavior.STATE_COLLAPSED
     }
+
 
     /**
      * Coordinates are parsed locally; anything else goes to Nominatim. The
@@ -1039,12 +861,7 @@ class MapActivity : AppCompatActivity() {
                 val env = it.environment.copy(lat = lat, lng = lon)
                 saveFavourite(label, env)
                 selectedEnvironment = env
-                showToast(
-                    getString(
-                        R.string.recording_summary,
-                        env.cells.size, env.wifis.size, env.beacons.size
-                    )
-                )
+                showToast(getString(R.string.recording_summary, radioSummary(env)))
             }.onFailure {
                 showToast(getString(R.string.recording_failed))
                 saveFavourite(label, null)
@@ -1091,10 +908,7 @@ class MapActivity : AppCompatActivity() {
                 selectedEnvironment = FakeEnvironment.parse(favourite.environment)
                 showToast(
                     selectedEnvironment?.let {
-                        getString(
-                            R.string.favourite_loaded_full,
-                            it.cells.size, it.wifis.size, it.beacons.size
-                        )
+                        getString(R.string.favourite_loaded_full, radioSummary(it))
                     } ?: getString(R.string.favourite_loaded_position)
                 )
             }
@@ -1158,49 +972,17 @@ class MapActivity : AppCompatActivity() {
             requestPermissions()
             return
         }
-        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-        // Fused and network first, GPS last. Asking GPS for a fresh fix indoors
-        // returns nothing for as long as you are willing to wait — the button
-        // simply appeared dead — while the other two answer in a second from
-        // the cell and Wi-Fi environment.
-        val providers = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
-            add(LocationManager.NETWORK_PROVIDER)
-            add(LocationManager.GPS_PROVIDER)
-        }.filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
-
-        if (providers.isEmpty()) {
-            showToast(getString(R.string.turn_on_location))
-            startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-            return
-        }
-
-        // Show the most recent cached fix straight away so the button does
-        // something visible, then replace it if a fresh one arrives.
-        val cached = providers
-            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
-            .maxByOrNull { it.elapsedRealtimeNanos }
-        if (cached != null) applyRealFix(cached) else showToast(getString(R.string.locating))
-
-        val signal = CancellationSignal()
-        var delivered = false
-        lm.getCurrentLocation(providers.first(), signal, mainExecutor) { location ->
-            delivered = true
-            if (location != null) {
-                applyRealFix(location)
-            } else if (cached == null) {
-                showToast(getString(R.string.address_not_found))
+        showToast(getString(R.string.locating))
+        DeviceLocator(this).locate(object : DeviceLocator.Callback {
+            override fun onProvidersOff() {
+                showToast(getString(R.string.turn_on_location))
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             }
-        }
-        // getCurrentLocation has no timeout of its own, and an outstanding
-        // request holds the radio awake.
-        binding.root.postDelayed({
-            if (!delivered) {
-                signal.cancel()
-                if (cached == null) showToast(getString(R.string.address_not_found))
-            }
-        }, FIX_TIMEOUT_MS)
+
+            override fun onFix(location: Location) = applyRealFix(location)
+
+            override fun onNothing() = showToast(getString(R.string.address_not_found))
+        })
     }
 
     private fun applyRealFix(location: Location) {
@@ -1278,8 +1060,7 @@ class MapActivity : AppCompatActivity() {
             .setMessage(
                 getString(
                     R.string.test_env_message,
-                    env.cells.size, env.wifis.size, env.beacons.size,
-                    TestEnvironment.OPERATOR, TestEnvironment.SSID_PREFIX
+                    radioSummary(env), TestEnvironment.OPERATOR, TestEnvironment.SSID_PREFIX
                 )
             )
             .setPositiveButton(R.string.test_env_apply) { _, _ ->
@@ -1295,62 +1076,8 @@ class MapActivity : AppCompatActivity() {
 
     // --- offline ------------------------------------------------------------
 
-    /**
-     * Downloads the current viewport for offline use through MapLibre's own
-     * offline store.
-     *
-     * This is legitimate only because the tiles come from OpenFreeMap, which
-     * places no limits on requests. The OSM Foundation's policy bans
-     * pre-fetching from tile.openstreetmap.org outright, so the previous raster
-     * implementation would have got the client blocked.
-     */
     private fun downloadCurrentArea() {
-        val map = mapLibre ?: return
-        val bounds = map.projection.visibleRegion.latLngBounds
-        val minZoom = map.cameraPosition.zoom.coerceAtLeast(1.0)
-        val maxZoom = (minZoom + OFFLINE_EXTRA_ZOOM).coerceAtMost(16.0)
-
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.offline_download)
-            .setMessage(getString(R.string.offline_confirm, minZoom.toInt(), maxZoom.toInt()))
-            .setPositiveButton(R.string.offline_start) { _, _ ->
-                runOfflineDownload(bounds, minZoom, maxZoom)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun runOfflineDownload(
-        bounds: org.maplibre.android.geometry.LatLngBounds,
-        minZoom: Double,
-        maxZoom: Double
-    ) {
-        val progress = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.offline_downloading)
-            .setMessage(getString(R.string.offline_progress_pct, 0))
-            .setCancelable(false)
-            .show()
-
-        OfflineRegions(this).download(
-            name = "%.4f,%.4f".format(bounds.center.latitude, bounds.center.longitude),
-            bounds = bounds,
-            minZoom = minZoom,
-            maxZoom = maxZoom,
-            pixelRatio = resources.displayMetrics.density,
-            onProgress = {
-                progress.setMessage(
-                    getString(R.string.offline_progress_pct, (it.fraction * 100).toInt())
-                )
-            },
-            onComplete = {
-                progress.dismiss()
-                showToast(getString(R.string.offline_done))
-            },
-            onError = { reason ->
-                progress.dismiss()
-                showToast(getString(R.string.offline_failed, reason))
-            }
-        )
+        mapLibre?.let { OfflineDownloadUi(this).offer(it) }
     }
 
     private companion object {
@@ -1358,47 +1085,11 @@ class MapActivity : AppCompatActivity() {
         const val DEFAULT_ZOOM = 15.0
         const val ADDRESS_DEBOUNCE_MS = 600L
 
-        /** Zoom levels beyond the current one to also fetch when going offline. */
-        const val OFFLINE_EXTRA_ZOOM = 3.0
-
-        const val SOURCE_SELECTION = "telequant-selection"
-        const val SOURCE_ACTIVE = "telequant-active"
-        const val SOURCE_JITTER = "telequant-jitter"
-        const val SOURCE_LIVE = "telequant-live"
-        const val LAYER_SELECTION = "telequant-selection"
-        const val LAYER_ACTIVE = "telequant-active"
-        const val LAYER_LIVE = "telequant-live"
-        const val IMAGE_LIVE = "telequant-live-icon"
-        const val IMAGE_SELECTION = "telequant-selection-icon"
-        const val IMAGE_ACTIVE = "telequant-active-icon"
-
-        /**
-         * MapLibre defaults to "Open Sans Regular, Arial Unicode MS Regular",
-         * which OpenFreeMap does not host — the glyph request 404s and every
-         * label silently fails to draw. This is the stack the style itself uses.
-         */
-        val MAP_FONT = arrayOf("Noto Sans Regular")
-        const val LAYER_JITTER_FILL = "telequant-jitter-fill"
-        const val LAYER_JITTER_LINE = "telequant-jitter-line"
-
-        /**
-         * The live marker is deliberately not the theme accent: the accent is
-         * already the selection ring, and two shades of one colour is the thing
-         * the user asked to be able to tell apart at a glance.
-         */
-        val COLOR_ACTIVE = Color.parseColor("#00A86B")
-        const val PROP_LABEL = "label"
-        const val CIRCLE_SEGMENTS = 64
-
-        /** How long to wait for a fresh fix before giving up on the radio. */
-        const val FIX_TIMEOUT_MS = 15_000L
-
         /**
          * How often the live fix is redrawn. Fast enough to read as motion,
          * slow enough that it is not redrawing the map every frame.
          */
         const val LIVE_REFRESH_MS = 400L
-        const val EARTH_RADIUS_M = 6378137.0
 
         /**
          * Separator is a comma or just whitespace, because a coordinate typed on
