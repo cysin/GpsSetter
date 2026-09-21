@@ -30,6 +30,30 @@ class OfflineRegions(context: Context) {
             get() = if (required > 0) completed.toDouble() / required else 0.0
     }
 
+    /** A download in flight. [cancel] stops it and discards the partial region. */
+    class Handle internal constructor() {
+        @Volatile
+        internal var region: OfflineRegion? = null
+
+        @Volatile
+        internal var cancelled = false
+
+        fun cancel() {
+            cancelled = true
+            val r = region ?: return
+            r.setObserver(null)
+            r.setDownloadState(OfflineRegion.STATE_INACTIVE)
+            // A half-downloaded region is not usable offline and would still
+            // show up in the list, so it goes with the cancellation.
+            r.delete(object : OfflineRegion.OfflineRegionDeleteCallback {
+                override fun onDelete() = Unit
+                override fun onError(error: String) {
+                    Timber.tag(TAG).w("delete after cancel: $error")
+                }
+            })
+        }
+    }
+
     fun download(
         name: String,
         bounds: LatLngBounds,
@@ -39,7 +63,8 @@ class OfflineRegions(context: Context) {
         onProgress: (Progress) -> Unit,
         onComplete: () -> Unit,
         onError: (String) -> Unit
-    ) {
+    ): Handle {
+        val handle = Handle()
         val definition = OfflineTilePyramidRegionDefinition(
             MapEngine.styleUrl(),
             bounds,
@@ -53,6 +78,13 @@ class OfflineRegions(context: Context) {
             JSONObject().put("name", name).toString().toByteArray(),
             object : OfflineManager.CreateOfflineRegionCallback {
                 override fun onCreate(offlineRegion: OfflineRegion) {
+                    handle.region = offlineRegion
+                    // Cancelled before the region even existed: clean it up
+                    // now rather than leaving an empty region behind.
+                    if (handle.cancelled) {
+                        handle.cancel()
+                        return
+                    }
                     observe(offlineRegion, onProgress, onComplete, onError)
                     offlineRegion.setDownloadState(OfflineRegion.STATE_ACTIVE)
                 }
@@ -60,6 +92,19 @@ class OfflineRegions(context: Context) {
                 override fun onError(error: String) = onError(error)
             }
         )
+        return handle
+    }
+
+    /** The stored name, or the id when the metadata is unreadable. */
+    fun nameOf(region: OfflineRegion): String = runCatching {
+        JSONObject(String(region.metadata)).optString("name")
+    }.getOrNull()?.ifBlank { null } ?: "#${region.id}"
+
+    fun delete(region: OfflineRegion, onDone: (String?) -> Unit) {
+        region.delete(object : OfflineRegion.OfflineRegionDeleteCallback {
+            override fun onDelete() = onDone(null)
+            override fun onError(error: String) = onDone(error)
+        })
     }
 
     private fun observe(

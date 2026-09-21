@@ -27,18 +27,58 @@ class OfflineDownloadUi(private val activity: Activity) {
             .setTitle(R.string.offline_download)
             .setMessage(activity.getString(R.string.offline_confirm, minZoom.toInt(), maxZoom.toInt()))
             .setPositiveButton(R.string.offline_start) { _, _ -> run(bounds, minZoom, maxZoom) }
+            .setNeutralButton(R.string.offline_manage) { _, _ -> manage() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
+    /**
+     * Lists what has been downloaded and lets it be deleted. Without this every
+     * download accumulated forever, with no way to see how much was there or
+     * to get the space back.
+     */
+    fun manage() {
+        val regions = OfflineRegions(activity)
+        regions.list { list ->
+            if (list.isEmpty()) {
+                activity.showToast(activity.getString(R.string.offline_none))
+                return@list
+            }
+            val names = list.map { regions.nameOf(it) }.toTypedArray()
+            MaterialAlertDialogBuilder(activity)
+                .setTitle(R.string.offline_manage)
+                .setItems(names) { _, index ->
+                    val region = list[index]
+                    MaterialAlertDialogBuilder(activity)
+                        .setTitle(names[index])
+                        .setMessage(R.string.offline_delete_confirm)
+                        .setPositiveButton(R.string.offline_delete) { _, _ ->
+                            regions.delete(region) { error ->
+                                activity.showToast(
+                                    if (error == null) activity.getString(R.string.offline_deleted)
+                                    else activity.getString(R.string.offline_failed, error)
+                                )
+                            }
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
     private fun run(bounds: LatLngBounds, minZoom: Double, maxZoom: Double) {
+        var handle: OfflineRegions.Handle? = null
         val progress = MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.offline_downloading)
             .setMessage(activity.getString(R.string.offline_progress_pct, 0))
             .setCancelable(false)
+            // A modal with no way out is a hung app if the download stalls.
+            .setNegativeButton(android.R.string.cancel) { _, _ -> handle?.cancel() }
             .show()
 
-        OfflineRegions(activity).download(
+        handle = OfflineRegions(activity).download(
             name = "%.4f,%.4f".format(bounds.center.latitude, bounds.center.longitude),
             bounds = bounds,
             minZoom = minZoom,

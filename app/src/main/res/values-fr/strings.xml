@@ -135,4 +135,9 @@
         <item quantity="one">%d balise</item>
         <item quantity="other">%d balises</item>
     </plurals>
+    <string name="offline_manage">Zones téléchargées</string>
+    <string name="offline_none">Rien de téléchargé pour l\'instant</string>
+    <string name="offline_delete_confirm">Supprimer cette zone téléchargée ? La carte la rechargera en ligne.</string>
+    <string name="offline_delete">Supprimer</string>
+    <string name="offline_deleted">Supprimé</string>
 </resources>

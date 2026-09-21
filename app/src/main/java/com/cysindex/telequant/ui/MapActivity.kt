@@ -1005,23 +1005,31 @@ class MapActivity : AppCompatActivity() {
         }
         showToast(getString(R.string.locating))
         DeviceLocator(this).locate(object : DeviceLocator.Callback {
+            // The locator hands back a cached fix at once and a fresh one when
+            // it arrives. Recentring for both meant the map yanked itself back
+            // seconds later, under a user who had already started panning.
+            private var recentred = false
+
             override fun onProvidersOff() {
                 showToast(getString(R.string.turn_on_location))
                 startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             }
 
-            override fun onFix(location: Location) = applyRealFix(location)
+            override fun onFix(location: Location) {
+                applyRealFix(location, recentre = !recentred)
+                recentred = true
+            }
 
             override fun onNothing() = showToast(getString(R.string.address_not_found))
         })
     }
 
-    private fun applyRealFix(location: Location) {
+    private fun applyRealFix(location: Location, recentre: Boolean) {
         lastRealFix = location
         moveTarget(
             location.latitude,
             location.longitude,
-            recentre = true,
+            recentre = recentre,
             origin = SelectionOrigin.REAL_FIX
         )
     }
