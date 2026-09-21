@@ -41,7 +41,8 @@ into the system server, which is not what any of this code expects.
 app/src/main/java/com/cysindex/telequant/
 ├── spoof/                    shared by both processes
 │   ├── FakeEnvironment.kt      recorded environment + org.json (de)serialisation
-│   ├── JitterEngine.kt         bounded random walk, metre/degree conversion
+│   ├── JitterEngine.kt         the wander, a pure function of the clock (see below)
+│   ├── SyntheticEnvironment.kt position-only mode: real operator, fabricated towers
 │   └── CoordinateTransform.kt  WGS-84 <-> GCJ-02, with an outOfChina guard
 ├── xposed/
 │   ├── HookEntry.kt            @InjectYukiHookWithXposed entry point
@@ -53,7 +54,13 @@ app/src/main/java/com/cysindex/telequant/
 │   └── hooks/                  one file per signal family
 ├── record/EnvironmentRecorder.kt   captures the radio environment (never the position)
 ├── map/                        MapLibre setup, offline regions, Nominatim
-└── ui/, room/, utils/          the module app itself
+├── ui/
+│   ├── MapActivity.kt          the screen: selection, favourites, start/stop
+│   ├── DeviceLocator.kt        the real position, cached-first with a bounded wait
+│   └── map/
+│       ├── MapMarkers.kt         the three markers and the jitter ring, as style layers
+│       └── OfflineDownloadUi.kt  download / cancel / list / delete offline areas
+└── room/, utils/               persistence, preferences
 
 audit/                        a SEPARATE APK: com.cysindex.telequant.audit
 └── SignalAuditActivity.kt      coverage checker, one row per hooked path
@@ -83,6 +90,16 @@ fields are `CellInfo.UNAVAILABLE`, and LAC 0 is reserved under 3GPP).
 **If you add a hook, read from the snapshot.** Do not call `PrefsBridge`
 directly and do not generate values locally; that is how the old inconsistency
 crept in.
+
+The same rule holds *across* processes. The module is loaded separately into
+every hooked app, so any state kept inside `SpoofEngine` is per-app: an earlier
+jitter implementation accumulated a random walk there, and two apps asking
+where the device was at the same instant got answers a dozen metres apart,
+each having started its walk at the exact centre of the circle. The wander is
+now a pure function of the wall clock — three sine waves per axis with coprime
+periods, mapped onto the disc — so every process computes the same point at
+the same moment, an app that launches later joins the path in progress, and
+the module app can draw the very fix being handed out.
 
 ---
 
@@ -179,15 +196,31 @@ Three things can be true of a point at once, so the map shows them apart:
 | | |
 |---|---|
 | **Hollow pin** | the selected point — where Start would put you |
-| **Filled green dot** | the position apps are being told right now, with the jitter ring around it. Absent when stopped. |
-| **Locate button** | moves the selection to where the device actually is. The module excludes itself from its own hooks, so this reads the real position even mid-simulation; if the reading lands on the simulated point it says so, because that is what adding this app to its own Xposed scope looks like. |
+| **Filled green dot** | the anchor apps are being told about, with the jitter ring around it. Absent when stopped. |
+| **Small green dot** | the exact fix being handed out this instant, wandering inside the ring. Redrawn four times a second from the same function the hooks evaluate, so it is the real value, not a lookalike. |
+| **Locate button** | moves the selection to where the device actually is. The module excludes itself from its own hooks, so this reads the real position even mid-simulation. It shows the most recent cached fix at once (fused and network before GPS — indoors, GPS never answers) and upgrades to a fresh one if it arrives within fifteen seconds, without recentring a second time. |
+
+The bottom sheet names the mode that is running — position only, or position
+plus the recorded surroundings with their counts — and the drawer header says
+whether the framework confirmed the module is active. That check can be a
+false negative; it is informational, never blocking.
+
+The map keeps its geographic centre in the middle of what can be seen: camera
+padding follows the sheet's top edge, so when the keyboard lifts the sheet the
+content shifts rather than the place in view sliding under it, and a recentre
+lands the point where it is visible.
+
+A single tap places the selected point. Panning and double-tap zoom do not:
+MapLibre reports a *confirmed* tap, which neither produces.
 
 **Searching.** A place name or a coordinate moves the selected point there and
 centres the map on it. Nothing is committed by that: the selection is free to
 change, and the only irreversible step is Start.
 
 **Saving a place.** The star saves the selected point, and offers to record the
-cells, Wi-Fi and beacons around you at the same time. The recorder never
+cells, Wi-Fi and beacons around you at the same time. Moving the selected point
+by hand drops any recording attached to the previous one; loading a favourite
+attaches its own. The recorder never
 captures a position — the coordinate is the selected point — so recording works
 indoors, where a GPS fix would time out and where a Wi-Fi recording is worth
 most. The dialog shows how far the selection is from the device's actual
@@ -258,9 +291,10 @@ to ship an update** — Android refuses an update signed with a different key.
 Compile checks catch very little here; almost every failure mode is a hook that
 silently does nothing.
 
-1. `./gradlew testDebugUnitTest` — the jitter walk, the GCJ-02 transform, the
-   environment's JSON round trip and the synthetic profile are covered without a
-   device. Seeds are fixed, so a failure reproduces.
+1. `./gradlew testDebugUnitTest` — 42 tests: the wander (bounded however
+   coarsely sampled, identical across callers at one instant, never starting on
+   the anchor), the GCJ-02 transform, the environment's JSON round trip, the
+   synthetic profile and position-only mode. No device needed.
 2. `./gradlew assembleDebug lintDebug` — lint must stay at zero errors.
 3. Confirm `assets/xposed_init` is present in the APK (above).
 4. Install the auditor, add **it** to the module's Xposed scope (not the module),
@@ -274,7 +308,8 @@ silently does nothing.
    returning real data is visible at a glance. It prints `getLastKnownLocation`
    through both the getter and `toString()`, since those disagreeing is exactly
    the class of bug it exists to catch.
-5. **Load the synthetic profile first** (drawer → *Load test environment*).
+5. **Load the synthetic profile first** (Favourites → *Load test environment*;
+   it is saved as a place and replays like any other).
    Auditing against a recording made on the same phone proves nothing: the
    recording holds that phone's real towers, so a hooked read and an unhooked
    one return the same values. The synthetic profile cannot be confused with
@@ -306,18 +341,43 @@ Offline regions are downloaded through MapLibre's own `OfflineManager`. Because
 online and offline are the same renderer reading the same vector data through
 the same style, a downloaded region is indistinguishable from the live map.
 
-**Tile proxy** — off-by-default host/port, defaulting to `127.0.0.1:33009`.
-MapLibre fetches through OkHttp, so the proxy is installed by replacing its
-client (`HttpRequestUtil.setOkHttpClient`), not through any osmdroid-style
-configuration. It must be an **HTTP** proxy supporting CONNECT: the tile
-endpoints are HTTPS and the hop to the proxy itself is plaintext, which is why
-the setting has no scheme field.
+Downloaded areas can be listed and deleted from the download dialog, and a
+download in progress can be cancelled (the partial region is deleted with it).
+
+**Proxy** — one host/port, defaulting to `127.0.0.1:33009`, with a switch per
+destination. Which hosts a network blocks is a property of the network, and the
+two destinations measured differently on the same connection: the tile host
+answered directly in about 0.7 s and through the proxy in about 1.2 s, while
+`nominatim.openstreetmap.org` did not answer directly at all. So the defaults
+are **tiles direct, search proxied**, and both are the user's to change.
+MapLibre fetches through OkHttp, so its proxy is installed by replacing the
+client (`HttpRequestUtil.setOkHttpClient`); both clients are rebuilt when the
+setting changes, so it takes effect without a restart. The proxy must be an
+**HTTP** proxy supporting CONNECT: the endpoints are HTTPS and the hop to the
+proxy itself is plaintext, which is why the setting has no scheme field.
+
+A search that cannot reach the geocoder says so — naming the proxy and its
+state — rather than reporting "address not found", which sends the user
+hunting for a spelling mistake.
 
 **Geocoding** is Nominatim, not `android.location.Geocoder`. The platform
 geocoder is backed by Play Services and returns nothing without them, so on a
 GMS-free device — including most in mainland China — place search silently never
-worked. Coordinate input (`39.9042,116.4074`) is parsed locally and never
-touches the network.
+worked. Coordinate input (`39.9042,116.4074`, or space-separated, or with the
+full-width comma a Chinese IME produces) is parsed locally and never touches
+the network.
+
+**Keyboard.** `setDecorFitsSystemWindows` is off, so the window does not resize
+for the IME; the activity asks for `adjustNothing` so the system does not pan
+it either; and `BottomSheetBehavior` places the sheet by its parent's *height*
+(`parentHeight = parent.getHeight()` in its source — it neither reads
+`Type.ime()` nor touches `translationY`). The sheet is therefore lifted by
+giving its parent a bottom margin equal to the IME inset, which is the one
+thing that behavior honours. Padding the parent moves nothing, and a
+translation on the sheet is undone by the next layout pass. The search
+container must not have `animateLayoutChanges`: a `LayoutTransition` suppresses
+parent layout while it runs, and the sheet ended up at the top of the screen on
+the first character typed.
 
 ---
 
@@ -326,8 +386,12 @@ touches the network.
 `darkTheme`, `accuracy_settings`, `jitter_radius` (metres; **0 pins the position
 exactly**), `jitter_mode` (STATIONARY/WALKING/DRIVING), `spoof_cell`,
 `spoof_wifi`, `spoof_bluetooth`, `gcj02_output`, `spoof_timezone`,
-`tile_proxy_enabled`, `tile_proxy_host`, `tile_proxy_port`, `map_style`,
-`offline_map`.
+`proxy_tiles_enabled` (default off), `geocoder_proxy_enabled` (default on),
+`tile_proxy_host`, `tile_proxy_port` (the host/port keys keep their old names
+so an already-configured proxy survives the split), `map_style`, `offline_map`.
+
+`accuracy_settings` is what every fix *claims* as its horizontal accuracy;
+`jitter_radius` is how far the fix actually moves. They are independent.
 
 Keys are the contract between `PrefManager` (module app) and `PrefsBridge`
 (hooked process); the two read the same world-readable file and must stay in
@@ -346,7 +410,9 @@ is WGS-84.
 Android 11+ (`minSdk 30`), `targetSdk 36`, `compileSdk 37`. Magisk or KernelSU
 with Zygisk, plus [Vector](https://github.com/JingMatrix/Vector) or another
 framework implementing the legacy Xposed API. Target apps must be added to the
-module's scope manually.
+module's scope manually. TeleQuant itself does not need to be in its own scope:
+hooks are installed with `loadApp(isExcludeSelf = true)`, and Vector loads the
+module into its own process for the activation check regardless.
 
 ---
 
