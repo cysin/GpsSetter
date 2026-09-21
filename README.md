@@ -394,8 +394,10 @@ so an already-configured proxy survives the split), `map_style`, `offline_map`.
 `jitter_radius` is how far the fix actually moves. They are independent.
 
 Keys are the contract between `PrefManager` (module app) and `PrefsBridge`
-(hooked process); the two read the same world-readable file and must stay in
-step. The per-signal switches are folded into the snapshot rather than read
+(hooked process); both sides name them in `config/ConfigKeys.kt`. Which
+*transport* carries them is decided at runtime — see "Without root" below.
+`rootless_mode` (default off) opens the provider that serves them when no file
+can be read. The per-signal switches are folded into the snapshot rather than read
 individually by each hook, so a hook cannot act on a stale toggle while the rest
 of the snapshot reflects a newer one.
 
@@ -405,11 +407,67 @@ is WGS-84.
 
 ---
 
+## Without root
+
+The same APK is also a module for [LSPatch](https://github.com/JingMatrix/LSPatch),
+which embeds the framework into a single app's APK instead of the system. The
+hooks are unchanged — they run inside the target's process either way. What
+changes is how the settings get to them.
+
+**Why anything had to change.** Under Vector, `XSharedPreferences` works
+because the daemon answers `getPrefsPath` with a directory it keeps outside the
+module App and makes world-readable. LSPatch answers the same call with
+`/data/data/com.cysindex.telequant/shared_prefs/` (`LocalApplicationService.java:100`,
+`RemoteApplicationService.java:366`), which is mode 0700 — the patched app's uid
+cannot even traverse it. The open fails, and `XSharedPreferences` reports that
+as *every value being absent*, so the module would load, hook everything, and
+silently spoof nothing.
+
+**How they get through instead.** `ConfigRouter` picks a route at runtime and
+names it in the log (`settings read through …`):
+
+| Route | When |
+|---|---|
+| `XSharedPreferences` | the file can actually be read — rooted frameworks |
+| `ContentProvider` | otherwise, asking the module App over a binder |
+| cached copy | otherwise, from `noBackupFilesDir` in the hooked app's own storage |
+
+The cached copy is not a nicety: a module App killed in the background answers
+exactly like one that is not installed, and without it the process would fall
+back to telling the app where the device really is. Changes reach a running app
+through a `ContentObserver` on the provider URI, so nothing polls and no target
+has to be restarted.
+
+**Setting it up.**
+
+1. Turn on **Answer patched apps** in TeleQuant's settings (`rootless_mode`). The
+   provider is exported and has no permission on it — a patched app is signed
+   with a different key, so a signature permission would exclude exactly the
+   callers it exists for — which is why the setting is the lock, and off by
+   default.
+2. Patch the target with LSPatch. In *manager mode* it injects
+   `QUERY_ALL_PACKAGES` itself (`ApkPatcher.java:442`); in *integrated mode* add
+   it by hand — `--add-permission QUERY_ALL_PACKAGES` — or the patched app
+   cannot see this one and the provider is invisible to it.
+3. Install the patched APK. Its signature differs from the original, so the
+   original must be uninstalled first: **that app's data and logins are lost.**
+4. The drawer shows `Active in <package> · <when>` once the patched app has read
+   the settings. `YukiHookAPI.Status.isModuleActive` is always false here — this
+   App is not itself patched, so it cannot observe its own effect.
+
+**What the route does not change:** everything in "Apps outside the scope" still
+holds, and system_server cannot be hooked at all without root. What it costs is
+the per-app patching, the lost app data, and any integrity check the target
+runs on its own signature (LSPatch offers bypass levels 1–3; 2 is the default).
+
+---
+
 ## Requirements
 
-Android 11+ (`minSdk 30`), `targetSdk 36`, `compileSdk 37`. Magisk or KernelSU
-with Zygisk, plus [Vector](https://github.com/JingMatrix/Vector) or another
-framework implementing the legacy Xposed API. Target apps must be added to the
+Android 11+ (`minSdk 30`), `targetSdk 36`, `compileSdk 37`. With root: Magisk or
+KernelSU with Zygisk, plus [Vector](https://github.com/JingMatrix/Vector) or
+another framework implementing the legacy Xposed API. Without root: LSPatch
+(Android 9+), per patched app — see above. Target apps must be added to the
 module's scope manually. TeleQuant itself does not need to be in its own scope:
 hooks are installed with `loadApp(isExcludeSelf = true)`, and Vector loads the
 module into its own process for the activation check regardless.

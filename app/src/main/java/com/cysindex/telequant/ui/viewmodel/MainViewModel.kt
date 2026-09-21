@@ -46,10 +46,33 @@ class MainViewModel(
         PrefManager.update(start, la, ln)
     }
 
-    val isXposed = MutableLiveData<Boolean>()
+    /**
+     * What is known about the module actually running somewhere.
+     *
+     * Under a rooted framework the module is loaded into this App as well, so
+     * it can report on itself. Under a rootless one it cannot: the module runs
+     * only inside apps that were patched, and this App is not one of them —
+     * `isModuleActive` there is false however well spoofing is working. What
+     * can be known instead is which package last read the settings, so that is
+     * what gets shown.
+     */
+    sealed interface HookStatus {
+        data object Unknown : HookStatus
+        data object Active : HookStatus
+        data class Reading(val packageName: String, val at: Long) : HookStatus
+    }
 
-    fun updateXposedState() {
-        onMain { isXposed.value = YukiHookAPI.Status.isModuleActive }
+    val hookStatus = MutableLiveData<HookStatus>()
+
+    fun updateHookStatus() {
+        onMain {
+            hookStatus.value = when {
+                YukiHookAPI.Status.isModuleActive -> HookStatus.Active
+                else -> PrefManager.hookCheckIns.maxByOrNull { it.value }
+                    ?.let { HookStatus.Reading(it.key, it.value) }
+                    ?: HookStatus.Unknown
+            }
+        }
     }
 
     fun deleteFavourite(favourite: Favourite) = onIO {

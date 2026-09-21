@@ -3,7 +3,7 @@ plugins {
     id 'com.google.devtools.ksp'
 }
 
-def tagName = '0.1.0'
+def tagName = '0.2.0'
 
 android {
     namespace 'com.cysindex.telequant'
@@ -15,7 +15,7 @@ android {
         applicationId "com.cysindex.telequant"
         minSdk 30
         targetSdk 36
-        versionCode 1401
+        versionCode 1402
         versionName tagName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TAG_NAME", "\"${tagName}\"")

@@ -13,6 +13,7 @@ import android.location.Location
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.DateUtils
 import android.telephony.TelephonyManager
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
@@ -343,7 +344,7 @@ class MapActivity : AppCompatActivity() {
         super.onResume()
         mapView.onResume()
         startLiveFix()
-        viewModel.updateXposedState()
+        viewModel.updateHookStatus()
         // Radius or style may have been changed in settings while we were away.
         redrawTarget()
     }
@@ -757,12 +758,22 @@ class MapActivity : AppCompatActivity() {
     private fun isModuleEnable() {
         val status = binding.navView.getHeaderView(0)
             ?.findViewById<TextView>(R.id.header_status) ?: return
-        viewModel.isXposed.observe(this) { isXposed ->
-            status.text = getString(
-                if (isXposed) R.string.module_active else R.string.module_unconfirmed
-            )
+        viewModel.hookStatus.observe(this) { state ->
+            status.text = when (state) {
+                is MainViewModel.HookStatus.Active -> getString(R.string.module_active)
+                // Without root the module cannot report on itself, so what is
+                // shown is the app that last asked for the settings and when.
+                is MainViewModel.HookStatus.Reading -> getString(
+                    R.string.module_active_in,
+                    state.packageName,
+                    DateUtils.getRelativeTimeSpanString(
+                        state.at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS
+                    )
+                )
+                else -> getString(R.string.module_unconfirmed)
+            }
             status.setOnClickListener {
-                if (isXposed) return@setOnClickListener
+                if (state !is MainViewModel.HookStatus.Unknown) return@setOnClickListener
                 MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.error_xposed_module_missing)
                     .setMessage(R.string.error_xposed_module_missing_desc)

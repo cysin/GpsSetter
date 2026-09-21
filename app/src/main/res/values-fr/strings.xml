@@ -143,4 +143,5 @@
     <string name="rootless_category">Cadres sans root</string>
     <string name="rootless_mode">Répondre aux applis patchées</string>
     <string name="rootless_mode_summary">Autorise les applis patchées avec LSPatch à lire ces réglages. À laisser désactivé avec un cadre rooté tel que Vector, qui n\'en a pas besoin.</string>
+    <string name="module_active_in">Actif dans %1$s · %2$s</string>
 </resources>
