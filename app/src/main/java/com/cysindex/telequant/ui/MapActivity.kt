@@ -203,6 +203,7 @@ class MapActivity : AppCompatActivity() {
                 style = loaded
                 // Sources and layers can only be added once the style is loaded.
                 markers.install(loaded)
+                updateMapPadding(animate = false)
                 redrawTarget()
                 startLiveFix()
                 updateAddressLabel()
@@ -578,6 +579,10 @@ class MapActivity : AppCompatActivity() {
                     binding.coordinator.layoutParams = lp
                 }
             }
+            topInset = bars.top
+            // After the sheet has been re-laid out for the new margin, so its
+            // position reflects where the keyboard left it.
+            binding.root.post { updateMapPadding(animate = true) }
 
             // Consumed, as before: passed through, the parent layouts also make
             // room for the keyboard and the sheet ends up lifted twice.
@@ -585,6 +590,32 @@ class MapActivity : AppCompatActivity() {
         }
 
         bottom.state = BottomSheetBehavior.STATE_COLLAPSED
+        bottom.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) = updateMapPadding(animate = false)
+            override fun onSlide(bottomSheet: View, slideOffset: Float) = updateMapPadding(animate = false)
+        })
+    }
+
+    private var topInset = 0
+
+    /**
+     * Keeps the map's geographic centre in the middle of what can be seen.
+     *
+     * The map view is full-screen behind the sheet, so its natural centre sits
+     * under the sheet's top edge, and when the keyboard lifts the sheet the
+     * visible region shrinks around a point that does not move. Camera padding
+     * redefines the centre as the middle of the uncovered area: the target
+     * stays put while the padding changes, so the content shifts to keep the
+     * same place centred as the keyboard comes and goes, and a recentre lands
+     * the point where it can be seen rather than under the sheet.
+     */
+    private fun updateMapPadding(animate: Boolean) {
+        val map = mapLibre ?: return
+        val sheet = binding.bottomSheetContainer.bottomSheet
+        if (sheet.height == 0) return
+        val covered = (mapView.height - sheet.top).coerceIn(0, mapView.height - topInset - 1)
+        val update = CameraUpdateFactory.paddingTo(0.0, topInset.toDouble(), 0.0, covered.toDouble())
+        if (animate) map.easeCamera(update, PADDING_EASE_MS) else map.moveCamera(update)
     }
 
 
@@ -1084,6 +1115,9 @@ class MapActivity : AppCompatActivity() {
         const val PERMISSION_ID = 42
         const val DEFAULT_ZOOM = 15.0
         const val ADDRESS_DEBOUNCE_MS = 600L
+
+        /** Roughly the keyboard's own animation, so the two move together. */
+        const val PADDING_EASE_MS = 250
 
         /**
          * How often the live fix is redrawn. Fast enough to read as motion,
