@@ -72,7 +72,7 @@ object SpoofEngine {
 
     private val random = Random.Default
 
-    val isEnabled: Boolean get() = PrefsBridge.isStarted
+    val isEnabled: Boolean get() = PrefsBridge.config().started
 
     fun current(): Snapshot {
         val now = SystemClock.elapsedRealtimeNanos()
@@ -89,8 +89,12 @@ object SpoofEngine {
     }
 
     private fun build(nowNanos: Long): Snapshot {
-        val enabled = PrefsBridge.isStarted
-        val env = PrefsBridge.environment()
+        // Read once. Every field below comes from this one view of the
+        // settings, so a snapshot cannot be assembled half from before a change
+        // and half from after it.
+        val config = PrefsBridge.config()
+        val enabled = config.started
+        val env = PrefsBridge.environment(config)
 
         // A recorded environment carries its own coordinates; a bare point
         // comes from the map. The recorded one wins when present so that the
@@ -100,11 +104,11 @@ object SpoofEngine {
         // silently move the anchor into the Gulf of Guinea and throw away the
         // point the user chose, so only a recording that actually got a fix is
         // allowed to override it.
-        val anchorLat = env?.lat?.takeIf { env.hasFix() } ?: PrefsBridge.anchorLat
-        val anchorLng = env?.lng?.takeIf { env.hasFix() } ?: PrefsBridge.anchorLng
+        val anchorLat = env?.lat?.takeIf { env.hasFix() } ?: config.lat
+        val anchorLng = env?.lng?.takeIf { env.hasFix() } ?: config.lng
 
-        val radius = PrefsBridge.jitterRadiusMeters
-        val mode = runCatching { JitterEngine.Mode.valueOf(PrefsBridge.jitterMode) }
+        val radius = config.jitterRadiusMeters
+        val mode = runCatching { JitterEngine.Mode.valueOf(config.jitterMode) }
             .getOrDefault(JitterEngine.Mode.STATIONARY)
 
         // Evaluated against the wall clock rather than accumulated here: this
@@ -117,7 +121,7 @@ object SpoofEngine {
         )
 
         // Applied last, and only inside its area of validity.
-        if (PrefsBridge.gcj02Output) {
+        if (config.gcj02Output) {
             val converted = CoordinateTransform.wgs84ToGcj02(lat, lng)
             lat = converted.first
             lng = converted.second
@@ -132,7 +136,7 @@ object SpoofEngine {
             // position, so a recording's accuracy is a placeholder rather than
             // a measurement, and preferring it left the settings value with no
             // effect at all.
-            accuracy = PrefsBridge.accuracy,
+            accuracy = config.accuracy,
             speedMps = sample.speedMps,
             bearingDeg = sample.bearingDeg,
             // Never leave this at 0: consumers treat elapsedRealtimeNanos as the
@@ -148,11 +152,11 @@ object SpoofEngine {
             operatorNumeric = env?.operatorNumeric ?: env?.cells?.firstOrNull()?.numeric(),
             countryIso = env?.countryIso,
             networkType = env?.networkType ?: 0,
-            timeZoneId = env?.timeZoneId?.takeIf { PrefsBridge.spoofTimeZone },
-            spoofCell = PrefsBridge.spoofCell,
-            spoofWifi = PrefsBridge.spoofWifi,
-            spoofBluetooth = PrefsBridge.spoofBluetooth,
-            spoofTimeZone = PrefsBridge.spoofTimeZone
+            timeZoneId = env?.timeZoneId?.takeIf { config.spoofTimeZone },
+            spoofCell = config.spoofCell,
+            spoofWifi = config.spoofWifi,
+            spoofBluetooth = config.spoofBluetooth,
+            spoofTimeZone = config.spoofTimeZone
         )
     }
 
