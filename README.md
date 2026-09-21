@@ -414,6 +414,34 @@ module's scope manually. TeleQuant itself does not need to be in its own scope:
 hooks are installed with `loadApp(isExcludeSelf = true)`, and Vector loads the
 module into its own process for the activation check regardless.
 
+### Apps outside the scope
+
+**An app that is not in the scope is not affected.** Nothing here reaches out of
+the process it was injected into: each hooked process reads the same
+world-readable preferences and derives its own answers, the wander is a function
+of the clock rather than anything pushed around, and the hooks never write
+outside their own process — no `addTestProvider`, no mock-location flag, no
+broadcast, no service.
+
+Two ways to break that, one of which is now blocked:
+
+- **`android` (system_server) is refused.** Every hooker is written for a client
+  process, and system_server is the one that serves location to every app on the
+  device; installing client-side hooks there spoofs applications the user never
+  selected. An earlier version shipped `android` in its *recommended* scope, so
+  following the recommendation did exactly that — the likely cause of "an app I
+  never hooked started drifting". `HookEntry` now bails out of that process, and
+  the recommended scope is empty.
+- **Scoping a location provider still spreads.** Google Play Services hosts the
+  Fused Location Provider for other apps, so putting it in scope hands the
+  spoofed position to everything that asks it. This is not blocked — it is a
+  normal app process and may be what someone wants — but it is not the same
+  thing as spoofing one app.
+
+Verified end to end: with the anchor set to Shanghai, the in-scope auditor
+reported 31.2283, 121.4783 while AMap, out of scope, showed the device's real
+position in Qingdao.
+
 ---
 
 ## Credits and licence
