@@ -1,5 +1,6 @@
 package com.cysindex.telequant.xposed.core
 
+import com.cysindex.telequant.config.ConfigKeys
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

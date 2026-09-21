@@ -140,4 +140,7 @@
     <string name="offline_delete_confirm">Supprimer cette zone téléchargée ? La carte la rechargera en ligne.</string>
     <string name="offline_delete">Supprimer</string>
     <string name="offline_deleted">Supprimé</string>
+    <string name="rootless_category">Cadres sans root</string>
+    <string name="rootless_mode">Répondre aux applis patchées</string>
+    <string name="rootless_mode_summary">Autorise les applis patchées avec LSPatch à lire ces réglages. À laisser désactivé avec un cadre rooté tel que Vector, qui n\'en a pas besoin.</string>
 </resources>

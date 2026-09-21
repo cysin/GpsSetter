@@ -2,7 +2,7 @@ package com.cysindex.telequant.xposed.core.source
 
 import android.content.Context
 import com.cysindex.telequant.xposed.core.Config
-import com.cysindex.telequant.xposed.core.ConfigKeys
+import com.cysindex.telequant.config.ConfigKeys
 import com.cysindex.telequant.xposed.core.ConfigReader
 import org.json.JSONObject
 import java.io.File

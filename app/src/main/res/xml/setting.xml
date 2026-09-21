@@ -46,6 +46,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/rootless_category">
+
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:key="rootless_mode"
+            android:summary="@string/rootless_mode_summary"
+            android:title="@string/rootless_mode" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/signals">
 
         <rikka.material.preference.MaterialSwitchPreference

@@ -54,6 +54,19 @@
         </activity>
 
 
+        <!--
+            Exported on purpose and with no permission: the processes that need
+            it are patched apps, signed with a different key than this App, so a
+            signature permission could not let them in. What keeps it shut is
+            the rootless-mode setting, which is off unless the user turns it on,
+            and the fact that it serves one document and accepts no writes.
+        -->
+        <provider
+            android:name=".config.ConfigProvider"
+            android:authorities="${applicationId}.config"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

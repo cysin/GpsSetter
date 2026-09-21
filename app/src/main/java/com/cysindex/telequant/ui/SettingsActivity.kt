@@ -38,6 +38,7 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth
                 "spoof_timezone" -> PrefManager.spoofTimeZone
+                "rootless_mode" -> PrefManager.rootlessMode
                 "proxy_tiles_enabled" -> PrefManager.proxyTiles
                 "geocoder_proxy_enabled" -> PrefManager.proxyGeocoder
                 "offline_map" -> PrefManager.offlineMap
@@ -52,6 +53,7 @@ class SettingsActivity : AppCompatActivity() {
                 "spoof_wifi" -> PrefManager.spoofWifi = value
                 "spoof_bluetooth" -> PrefManager.spoofBluetooth = value
                 "spoof_timezone" -> PrefManager.spoofTimeZone = value
+                "rootless_mode" -> PrefManager.rootlessMode = value
                 "proxy_tiles_enabled" -> {
                     PrefManager.proxyTiles = value
                     // Takes effect now rather than on next launch.

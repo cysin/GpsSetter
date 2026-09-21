@@ -3,39 +3,28 @@ package com.cysindex.telequant.utils
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.config.ConfigContract
+import com.cysindex.telequant.config.ConfigKeys
 import com.cysindex.telequant.gsApp
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import rikka.material.app.DayNightDelegate
 
 
 @SuppressLint("WorldReadableFiles")
 object PrefManager   {
 
-    // These keys are the contract with the hooked process; PrefsBridge reads
-    // the same file through XSharedPreferences, so the two must stay in step.
-    private const val START = "start"
-    // Double-bit keys; the *_FLOAT names are what older builds wrote.
-    private const val LATITUDE = "latitude_d"
-    private const val LONGITUDE = "longitude_d"
-    private const val LATITUDE_FLOAT = "latitude"
-    private const val LONGITUDE_FLOAT = "longitude"
-    private const val ACCURACY_SETTING = "accuracy_settings"
+    // The keys the hooked process reads are the contract between the two
+    // sides and live in ConfigKeys; what is listed here is this App's own.
     private const val DARK_THEME = "dark_theme"
-    private const val JITTER_RADIUS = "jitter_radius"
-    private const val JITTER_MODE = "jitter_mode"
-    private const val GCJ02_OUTPUT = "gcj02_output"
-    private const val SPOOF_CELL = "spoof_cell"
-    private const val SPOOF_WIFI = "spoof_wifi"
-    private const val SPOOF_BLUETOOTH = "spoof_bluetooth"
-    private const val SPOOF_TIMEZONE = "spoof_timezone"
-    private const val ACTIVE_ENVIRONMENT = "active_environment"
-    // A fresh key rather than the old combined one. That key's stored value
-    // meant "proxy everything", so reusing it would hand everyone who had the
-    // proxy on the tile setting measured to be the slower of the two.
+    private const val ROOTLESS_MODE = "rootless_mode"
+    private const val HOOK_CHECK_INS = "hook_check_ins"
     private const val PROXY_TILES = "proxy_tiles_enabled"
     private const val GEOCODER_PROXY_ENABLED = "geocoder_proxy_enabled"
     private const val TILE_PROXY_HOST = "tile_proxy_host"
@@ -57,13 +46,87 @@ object PrefManager   {
                 prefsFile,
                 Context.MODE_PRIVATE
             )
-        }
-
+        }.also { it.registerOnSharedPreferenceChangeListener(watcher) }
     }
 
 
+    /**
+     * The keys a hooked process acts on. A change to one of them has to reach
+     * it; a change to the map style or the theme has no business waking
+     * anything up.
+     */
+    private val HOOK_KEYS = setOf(
+        ConfigKeys.STARTED, ConfigKeys.LAT, ConfigKeys.LNG,
+        ConfigKeys.LAT_FLOAT, ConfigKeys.LNG_FLOAT,
+        ConfigKeys.ACCURACY, ConfigKeys.JITTER_RADIUS, ConfigKeys.JITTER_MODE,
+        ConfigKeys.GCJ02, ConfigKeys.ENVIRONMENT,
+        ConfigKeys.SPOOF_CELL, ConfigKeys.SPOOF_WIFI,
+        ConfigKeys.SPOOF_BLUETOOTH, ConfigKeys.SPOOF_TIMEZONE
+    )
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val notifyReaders = Runnable {
+        runCatching { gsApp.contentResolver.notifyChange(ConfigContract.CONTENT_URI, null) }
+    }
+
+    /**
+     * One watcher rather than a line in every setter.
+     *
+     * Everything that changes a setting goes through this object — the map,
+     * the joystick, and the preference screen through its PreferenceDataStore —
+     * so watching the file catches all of them, including the ones added
+     * later. It does two things a hooked process depends on: it moves the
+     * version on, which is how a reader tells two copies of the settings
+     * apart, and it notifies the provider URI, which is what reaches an app
+     * that is running right now without it having to poll.
+     */
+    private val watcher = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key in HOOK_KEYS) {
+            pref.edit().putLong(ConfigKeys.VERSION, configVersion + 1).apply()
+            // Coalesced: a single edit that writes three keys is one change.
+            mainHandler.removeCallbacks(notifyReaders)
+            mainHandler.postDelayed(notifyReaders, NOTIFY_DELAY_MILLIS)
+        }
+    }
+
+    private const val NOTIFY_DELAY_MILLIS = 100L
+
+    /** Goes up on every change a hooked process cares about. */
+    val configVersion: Long get() = pref.getLong(ConfigKeys.VERSION, 0L)
+
+    /**
+     * Whether ConfigProvider answers at all.
+     *
+     * It is the only way to reach a process under a rootless framework, and it
+     * is off by default because a patched app is signed with a different key
+     * than this one — so the provider cannot be closed to everything else with
+     * a signature permission, and an exported door that nobody needs should
+     * not be standing open.
+     */
+    var rootlessMode: Boolean
+        get() = pref.getBoolean(ROOTLESS_MODE, false)
+        set(value) = pref.edit().putBoolean(ROOTLESS_MODE, value).apply()
+
+    /** Packages that have read the settings, and when they last did. */
+    val hookCheckIns: Map<String, Long>
+        get() = runCatching {
+            val document = JSONObject(pref.getString(HOOK_CHECK_INS, "{}").orEmpty())
+            document.keys().asSequence().associateWith { document.optLong(it) }
+        }.getOrDefault(emptyMap())
+
+    fun recordHookCheckIn(packageName: String) {
+        val updated = (hookCheckIns + (packageName to System.currentTimeMillis()))
+            .entries.sortedByDescending { it.value }.take(MAX_CHECK_INS)
+        val document = JSONObject()
+        updated.forEach { document.put(it.key, it.value) }
+        pref.edit().putString(HOOK_CHECK_INS, document.toString()).apply()
+    }
+
+    private const val MAX_CHECK_INS = 8
+
     val isStarted : Boolean
-        get() = pref.getBoolean(START, false)
+        get() = pref.getBoolean(ConfigKeys.STARTED, false)
 
     /**
      * Coordinates are stored as the raw bits of a Double.
@@ -75,10 +138,10 @@ object PrefManager   {
      * no putDouble, hence the bit round-trip.
      */
     val getLat: Double
-        get() = readCoordinate(LATITUDE, LATITUDE_FLOAT, DEFAULT_LAT)
+        get() = readCoordinate(ConfigKeys.LAT, ConfigKeys.LAT_FLOAT, DEFAULT_LAT)
 
     val getLng: Double
-        get() = readCoordinate(LONGITUDE, LONGITUDE_FLOAT, DEFAULT_LNG)
+        get() = readCoordinate(ConfigKeys.LNG, ConfigKeys.LNG_FLOAT, DEFAULT_LNG)
 
     private fun readCoordinate(key: String, legacyKey: String, fallback: Double): Double {
         if (pref.contains(key)) {
@@ -92,8 +155,8 @@ object PrefManager   {
     }
 
     var accuracy : String?
-        get() = pref.getString(ACCURACY_SETTING,"10")
-        set(value) { pref.edit().putString(ACCURACY_SETTING,value).apply()}
+        get() = pref.getString(ConfigKeys.ACCURACY,"10")
+        set(value) { pref.edit().putString(ConfigKeys.ACCURACY,value).apply()}
 
     var darkTheme: Int
         get() = pref.getInt(DARK_THEME, DayNightDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
@@ -104,39 +167,39 @@ object PrefManager   {
      * boolean "random position", which the jitter engine no longer reads.
      */
     var jitterRadius: String?
-        get() = pref.getString(JITTER_RADIUS, "10")
-        set(value) { pref.edit().putString(JITTER_RADIUS, value).apply() }
+        get() = pref.getString(ConfigKeys.JITTER_RADIUS, "10")
+        set(value) { pref.edit().putString(ConfigKeys.JITTER_RADIUS, value).apply() }
 
     /** One of JitterEngine.Mode: STATIONARY, WALKING, DRIVING. */
     var jitterMode: String?
-        get() = pref.getString(JITTER_MODE, "STATIONARY")
-        set(value) { pref.edit().putString(JITTER_MODE, value).apply() }
+        get() = pref.getString(ConfigKeys.JITTER_MODE, "STATIONARY")
+        set(value) { pref.edit().putString(ConfigKeys.JITTER_MODE, value).apply() }
 
     /** Emit GCJ-02 instead of WGS-84. Only affects coordinates inside China. */
     var gcj02Output: Boolean
-        get() = pref.getBoolean(GCJ02_OUTPUT, false)
-        set(value) = pref.edit().putBoolean(GCJ02_OUTPUT, value).apply()
+        get() = pref.getBoolean(ConfigKeys.GCJ02, false)
+        set(value) = pref.edit().putBoolean(ConfigKeys.GCJ02, value).apply()
 
     var spoofCell: Boolean
-        get() = pref.getBoolean(SPOOF_CELL, true)
-        set(value) = pref.edit().putBoolean(SPOOF_CELL, value).apply()
+        get() = pref.getBoolean(ConfigKeys.SPOOF_CELL, true)
+        set(value) = pref.edit().putBoolean(ConfigKeys.SPOOF_CELL, value).apply()
 
     var spoofWifi: Boolean
-        get() = pref.getBoolean(SPOOF_WIFI, true)
-        set(value) = pref.edit().putBoolean(SPOOF_WIFI, value).apply()
+        get() = pref.getBoolean(ConfigKeys.SPOOF_WIFI, true)
+        set(value) = pref.edit().putBoolean(ConfigKeys.SPOOF_WIFI, value).apply()
 
     var spoofBluetooth: Boolean
-        get() = pref.getBoolean(SPOOF_BLUETOOTH, true)
-        set(value) = pref.edit().putBoolean(SPOOF_BLUETOOTH, value).apply()
+        get() = pref.getBoolean(ConfigKeys.SPOOF_BLUETOOTH, true)
+        set(value) = pref.edit().putBoolean(ConfigKeys.SPOOF_BLUETOOTH, value).apply()
 
     var spoofTimeZone: Boolean
-        get() = pref.getBoolean(SPOOF_TIMEZONE, false)
-        set(value) = pref.edit().putBoolean(SPOOF_TIMEZONE, value).apply()
+        get() = pref.getBoolean(ConfigKeys.SPOOF_TIMEZONE, false)
+        set(value) = pref.edit().putBoolean(ConfigKeys.SPOOF_TIMEZONE, value).apply()
 
     /** The active recorded environment, serialised as JSON. */
     var activeEnvironment: String?
-        get() = pref.getString(ACTIVE_ENVIRONMENT, null)
-        set(value) { pref.edit().putString(ACTIVE_ENVIRONMENT, value).apply() }
+        get() = pref.getString(ConfigKeys.ENVIRONMENT, null)
+        set(value) { pref.edit().putString(ConfigKeys.ENVIRONMENT, value).apply() }
 
     /**
      * One proxy, chosen per destination.
@@ -179,9 +242,9 @@ object PrefManager   {
     fun update(start: Boolean, la: Double, ln: Double) {
         runInBackground {
             pref.edit()
-                .putLong(LATITUDE, la.toRawBits())
-                .putLong(LONGITUDE, ln.toRawBits())
-                .putBoolean(START, start)
+                .putLong(ConfigKeys.LAT, la.toRawBits())
+                .putLong(ConfigKeys.LNG, ln.toRawBits())
+                .putBoolean(ConfigKeys.STARTED, start)
                 .apply()
         }
     }

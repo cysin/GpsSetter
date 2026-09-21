@@ -142,4 +142,7 @@
     <string name="offline_delete_confirm">Delete this downloaded area? The map will fetch it again when online.</string>
     <string name="offline_delete">Delete</string>
     <string name="offline_deleted">Deleted</string>
+    <string name="rootless_category">Rootless frameworks</string>
+    <string name="rootless_mode">Answer patched apps</string>
+    <string name="rootless_mode_summary">Let apps patched with LSPatch read these settings. Leave off when you use a rooted framework such as Vector, which needs no help.</string>
 </resources>
