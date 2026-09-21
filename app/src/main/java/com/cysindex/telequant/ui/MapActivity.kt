@@ -60,7 +60,6 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.elevation.ElevationOverlayProvider
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -109,10 +108,6 @@ class MapActivity : AppCompatActivity() {
      * replay and Start simulates the position alone.
      */
     private var selectedEnvironment: FakeEnvironment? = null
-
-    /** A search result shown on the map but not yet taken as the selection. */
-    private var candidate: MapMarkers.LatLon? = null
-    private var candidateBar: Snackbar? = null
 
     private var baseSearchBottomMargin = -1
     private var addressJob: Job? = null
@@ -321,7 +316,6 @@ class MapActivity : AppCompatActivity() {
         lat = newLat
         lon = newLon
         selectionOrigin = origin
-        clearCandidate()
         // The environment belonged to the point that was just left. Carrying
         // it along meant loading "Office", tapping a park, and having Start
         // offer to replay the office's towers there — a contradictory
@@ -611,7 +605,7 @@ class MapActivity : AppCompatActivity() {
             if (parsedLat != null && parsedLon != null &&
                 parsedLat in -90.0..90.0 && parsedLon in -180.0..180.0
             ) {
-                previewPlace(parsedLat, parsedLon, "%.6f, %.6f".format(parsedLat, parsedLon))
+                moveTarget(parsedLat, parsedLon, recentre = true)
                 return
             }
             // Numeric but out of range — say so rather than sending digits to a
@@ -634,7 +628,7 @@ class MapActivity : AppCompatActivity() {
                 null -> showGeocoderUnreachable()
                 emptyList<Nominatim.Place>() -> showToast(getString(R.string.address_not_found))
                 else -> if (results.size == 1) {
-                    results[0].let { previewPlace(it.lat, it.lon, it.displayName) }
+                    moveTarget(results[0].lat, results[0].lon, recentre = true)
                 } else {
                     chooseSearchResult(results)
                 }
@@ -674,41 +668,9 @@ class MapActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.search_results)
             .setItems(results.map { it.displayName }.toTypedArray()) { _, index ->
-                results[index].let { previewPlace(it.lat, it.lon, it.displayName) }
+                results[index].let { moveTarget(it.lat, it.lon, recentre = true) }
             }
             .show()
-    }
-
-    /**
-     * Shows a search result without committing to it.
-     *
-     * The map moves there and a translucent pin marks the spot; the selection
-     * stays where it was until the user says so. Geocoding is ambiguous enough
-     * — a street name that exists in three cities, a coordinate with a dropped
-     * digit — that landing on the result and looking is the check, and moving
-     * the selection first meant the check came after the fact.
-     */
-    private fun previewPlace(placeLat: Double, placeLon: Double, name: String) {
-        candidate = MapMarkers.LatLon(placeLat, placeLon)
-        style?.let { markers.drawCandidate(it, candidate) }
-        mapLibre?.animateCamera(
-            CameraUpdateFactory.newLatLngZoom(LatLng(placeLat, placeLon), DEFAULT_ZOOM)
-        )
-        candidateBar?.dismiss()
-        candidateBar = Snackbar.make(
-            binding.coordinator,
-            getString(R.string.search_found, name),
-            Snackbar.LENGTH_INDEFINITE
-        ).setAction(R.string.search_use) {
-            moveTarget(placeLat, placeLon, recentre = false)
-        }.setAnchorView(binding.bottomSheetContainer.bottomSheet).also { it.show() }
-    }
-
-    private fun clearCandidate() {
-        candidate = null
-        style?.let { markers.drawCandidate(it, null) }
-        candidateBar?.dismiss()
-        candidateBar = null
     }
 
     /** Replaces MonetCompat; Material 3 dynamic color is applied app-wide in App. */

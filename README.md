@@ -182,11 +182,9 @@ Three things can be true of a point at once, so the map shows them apart:
 | **Filled green dot** | the position apps are being told right now, with the jitter ring around it. Absent when stopped. |
 | **Locate button** | moves the selection to where the device actually is. The module excludes itself from its own hooks, so this reads the real position even mid-simulation; if the reading lands on the simulated point it says so, because that is what adding this app to its own Xposed scope looks like. |
 
-**Searching.** A place name or a coordinate moves the map there and marks the
-result with a translucent pin; the selection does not move until *Use this
-point* is tapped. Geocoding is ambiguous enough that landing on the result and
-looking is the check, and moving the selection first put the check after the
-fact.
+**Searching.** A place name or a coordinate moves the selected point there and
+centres the map on it. Nothing is committed by that: the selection is free to
+change, and the only irreversible step is Start.
 
 **Saving a place.** The star saves the selected point, and offers to record the
 cells, Wi-Fi and beacons around you at the same time. The recorder never

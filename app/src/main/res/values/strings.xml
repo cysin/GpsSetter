@@ -125,9 +125,6 @@
     <string name="geocoder_unreachable_message">The request to nominatim.openstreetmap.org did not get through, so this is not a spelling problem.\n\nProxy for place search is %3$s (%1$s:%2$s). Map tiles have their own switch and are unaffected.</string>
     <string name="geocoder_proxy_on">on</string>
     <string name="geocoder_proxy_off">off</string>
-    <string name="marker_candidate">Search result</string>
-    <string name="search_found">Found: %1$s</string>
-    <string name="search_use">Use this point</string>
     <string name="search_clear">Clear search</string>
     <string name="mode_running_full">Simulating position and recorded surroundings · %1$s</string>
     <string name="mode_running_position">Simulating position only · carrier real, tower identifiers fabricated</string>

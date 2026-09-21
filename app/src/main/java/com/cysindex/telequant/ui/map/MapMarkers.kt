@@ -49,7 +49,6 @@ class MapMarkers(private val context: Context, private val accent: Int) {
         style.addSource(GeoJsonSource(SOURCE_SELECTION))
         style.addSource(GeoJsonSource(SOURCE_ACTIVE))
         style.addSource(GeoJsonSource(SOURCE_LIVE))
-        style.addSource(GeoJsonSource(SOURCE_CANDIDATE))
         style.addSource(GeoJsonSource(SOURCE_JITTER))
 
         // The jitter ring belongs to the active marker: it is the area apps are
@@ -116,29 +115,6 @@ class MapMarkers(private val context: Context, private val accent: Int) {
             )
         )
 
-        // A search result awaiting confirmation: the selection pin at half
-        // opacity, so it reads as "proposed" next to the committed one.
-        style.addLayer(
-            SymbolLayer(LAYER_CANDIDATE, SOURCE_CANDIDATE).withProperties(
-                PropertyFactory.iconImage(IMAGE_SELECTION),
-                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
-                PropertyFactory.iconOpacity(0.55f),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true),
-                PropertyFactory.textField(Expression.get(PROP_LABEL)),
-                PropertyFactory.textFont(MAP_FONT),
-                PropertyFactory.textSize(11f),
-                PropertyFactory.textOffset(arrayOf(0f, 0.6f)),
-                PropertyFactory.textAnchor(Property.TEXT_ANCHOR_TOP),
-                PropertyFactory.textHaloWidth(1.6f),
-                PropertyFactory.textHaloColor(Color.WHITE),
-                PropertyFactory.textColor(accent),
-                PropertyFactory.textOpacity(0.7f),
-                PropertyFactory.textAllowOverlap(true),
-                PropertyFactory.textOptional(true)
-            )
-        )
-
         // The wandering fix itself. Drawn above the anchor so it stays readable
         // when the two coincide, which they do whenever the radius is 0.
         style.addLayer(
@@ -195,20 +171,6 @@ class MapMarkers(private val context: Context, private val accent: Int) {
                 } else {
                     emptyList()
                 }
-            )
-        )
-    }
-
-    /** Shows a search result at [place], or clears it when null. */
-    fun drawCandidate(style: Style, place: LatLon?) {
-        val source = style.getSourceAs<GeoJsonSource>(SOURCE_CANDIDATE) ?: return
-        source.setGeoJson(
-            FeatureCollection.fromFeatures(
-                if (place == null) emptyList() else listOf(
-                    Feature.fromGeometry(Point.fromLngLat(place.lon, place.lat)).apply {
-                        addStringProperty(PROP_LABEL, context.getString(R.string.marker_candidate))
-                    }
-                )
             )
         )
     }
@@ -327,8 +289,6 @@ class MapMarkers(private val context: Context, private val accent: Int) {
         private const val SOURCE_ACTIVE = "telequant-active"
         private const val SOURCE_JITTER = "telequant-jitter"
         private const val SOURCE_LIVE = "telequant-live"
-        private const val SOURCE_CANDIDATE = "telequant-candidate"
-        private const val LAYER_CANDIDATE = "telequant-candidate"
         private const val LAYER_SELECTION = "telequant-selection"
         private const val LAYER_ACTIVE = "telequant-active"
         private const val LAYER_LIVE = "telequant-live"
