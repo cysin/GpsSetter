@@ -432,11 +432,19 @@ names it in the log (`settings read through …`):
 | `ContentProvider` | otherwise, asking the module App over a binder |
 | cached copy | otherwise, from `noBackupFilesDir` in the hooked app's own storage |
 
-The cached copy is not a nicety: a module App killed in the background answers
-exactly like one that is not installed, and without it the process would fall
-back to telling the app where the device really is. Changes reach a running app
-through a `ContentObserver` on the provider URI, so nothing polls and no target
-has to be restarted.
+The cached copy is not a nicety, and it is not hypothetical: a module App that
+has been force-stopped is not restarted by a binder call, so the provider
+simply does not answer — verified on a device, where the patched app kept
+spoofing from its cached copy and logged `settings read through cached copy`.
+Without it the process would fall back to telling the app where the device
+really is.
+
+Changes reach a running target through a `ContentObserver` on the provider URI,
+so no target has to be restarted. One wrinkle seen on hardware: while the
+target sits in the background the platform freezes it, and the notification is
+delivered when it is next resumed — which is the moment it matters. The 30-second
+refresh floor covers the case where the observer could not be registered at all
+(the log then says so).
 
 **Setting it up.**
 

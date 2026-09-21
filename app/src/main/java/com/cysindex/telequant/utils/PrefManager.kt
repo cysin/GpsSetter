@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.cysindex.telequant.BuildConfig
 import com.cysindex.telequant.config.ConfigContract
 import com.cysindex.telequant.config.ConfigKeys
@@ -68,7 +69,10 @@ object PrefManager   {
 
     private val notifyReaders = Runnable {
         runCatching { gsApp.contentResolver.notifyChange(ConfigContract.CONTENT_URI, null) }
+            .onFailure { Log.w(TAG, "could not tell hooked processes the settings changed", it) }
     }
+
+    private const val TAG = "TeleQuant"
 
     /**
      * One watcher rather than a line in every setter.

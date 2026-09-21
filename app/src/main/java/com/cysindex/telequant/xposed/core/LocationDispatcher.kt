@@ -4,6 +4,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Handler
 import android.os.Looper
+import com.highcapable.yukihookapi.hook.log.YLog
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
@@ -64,13 +65,28 @@ object LocationDispatcher {
         private val handler: Handler?,
         private val executor: Executor?
     ) {
-        fun post(block: () -> Unit) {
+        /**
+         * False when the target cannot take the work — the Looper it belongs to
+         * has quit, or the executor is shutting down. Neither state is
+         * recoverable, which is why the answer is worth returning: posting to a
+         * dead Looper does not throw, it logs "sending message to a Handler on
+         * a dead thread" and drops the message. Ignoring that meant an app
+         * whose handler thread had ended kept being fed twice a second for the
+         * life of its process — observed on a device as several hundred of
+         * those warnings from one registration.
+         */
+        fun post(block: () -> Unit): Boolean {
             val exec = executor
             val h = handler
-            when {
-                exec != null -> runCatching { exec.execute(block) }
+            return when {
+                // android.os.HandlerExecutor turns the same failure into a
+                // RejectedExecutionException.
+                exec != null -> runCatching { exec.execute(block) }.isSuccess
                 h != null -> h.post(block)
-                else -> block()
+                else -> {
+                    block()
+                    true
+                }
             }
         }
 
@@ -130,7 +146,17 @@ object LocationDispatcher {
                     }
                     if (!SpoofEngine.isEnabled) return@runCatching
                     val location = LocationFactory.build(registration.provider)
-                    registration.target.post { registration.deliver(listener, location) }
+                    val delivered = registration.target.post {
+                        registration.deliver(listener, location)
+                    }
+                    // The app is still holding the listener, but the thread it
+                    // asked to be called back on is gone. Nothing will reach it
+                    // again, so stop trying.
+                    if (!delivered) {
+                        YLog.debug("delivery target is gone; retiring a location listener")
+                        registrations.remove(key)
+                        registration.future?.cancel(false)
+                    }
                 }
             },
             INITIAL_DELAY_MS, period, TimeUnit.MILLISECONDS

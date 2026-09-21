@@ -10,6 +10,7 @@ import android.os.SystemClock
 import com.cysindex.telequant.config.ConfigContract
 import com.cysindex.telequant.xposed.core.Config
 import com.cysindex.telequant.xposed.core.ConfigReader
+import com.highcapable.yukihookapi.hook.log.YLog
 
 /**
  * The settings over a binder, which is how they arrive without root.
@@ -64,12 +65,19 @@ internal class ProviderSource(private val context: () -> Context?) : ConfigSourc
         val created = object : ContentObserver(handler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 staleAtMillis = 0L
+                YLog.debug("settings changed; re-reading on next use")
             }
         }
-        val registered = runCatching {
+        runCatching {
             resolver.registerContentObserver(ConfigContract.CONTENT_URI, true, created)
-        }.isSuccess
-        if (registered) observer = created
+        }.onSuccess {
+            observer = created
+            YLog.debug("watching the settings for changes")
+        }.onFailure {
+            // Not fatal: the refresh interval still picks changes up. Worth
+            // saying, because the difference is seconds against half a minute.
+            YLog.warn("cannot watch the settings, falling back to polling: $it")
+        }
     }
 
     /**
