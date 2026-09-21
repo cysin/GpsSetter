@@ -1,6 +1,7 @@
 package com.cysindex.telequant.xposed
 
 import com.cysindex.telequant.BuildConfig
+import com.cysindex.telequant.xposed.core.PrefsBridge
 import com.cysindex.telequant.xposed.hooks.BluetoothHooks
 import com.cysindex.telequant.xposed.hooks.CellHooks
 import com.cysindex.telequant.xposed.hooks.ConsistencyHooks
@@ -46,6 +47,10 @@ class HookEntry : IYukiHookXposedInit {
                 YLog.warn("refusing to hook $packageName ($processName): not an app process")
                 return@loadApp
             }
+
+            // Lazily: the Application does not exist yet, and the route the
+            // settings arrive by may need a binder into the module App.
+            PrefsBridge.attach { appContext }
 
             loadHooker(LocationHooks)
             loadHooker(GnssHooks)
